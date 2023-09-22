@@ -1,0 +1,147 @@
+\documentclass[runningheads]{llncs}
+%
+
+\usepackage{amsmath}
+\usepackage{amsfonts}
+%\usepackage{amsthm}
+
+\usepackage{tabularx}
+\usepackage{graphicx}
+\usepackage{hyperref}
+
+\usepackage{float}
+\usepackage{array}
+\usepackage{mdframed}
+\usepackage{tikz}
+\usepackage{placeins}
+
+\graphicspath{{figures/}}
+
+
+
+
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\makeatletter
+\algrenewcommand\ALG@beginalgorithmic{\fontsize{10pt}{2cm}}
+\makeatother
+
+\algnewcommand\algorithmicpublicinput{\textbf{Public input:}}
+\algnewcommand\Public{\item[\algorithmicpublicinput]}
+
+\algnewcommand\algorithmicprivateinput{\textbf{Private input:}}
+\algnewcommand\Private{\item[\algorithmicprivateinput]}
+
+
+
+\usepackage[document]{ragged2e}
+
+
+\usetikzlibrary{math}
+\usetikzlibrary{arrows.meta}
+
+
+
+\newfloat{Protocol}{t}{struct}
+
+\newfloat{circuit}{t}{loa}
+\floatname{circuit}{Circuit}
+
+\newfloat{contractfunction}{t}{loa}
+\floatname{contractfunction}{Rollup contract function}
+
+\usepackage[nameinlink]{cleveref}
+
+\Crefname{circuit}{Circuit}{Circuits}
+\Crefname{contractfunction}{Rollup contract function}{Rollup contract functions}
+
+\newtheorem{defn}{Definition}
+\newtheorem{prop}{Proposition}
+\newtheorem{cor}{Corollary}
+
+
+% Used for displaying a sample figure. If possible, figure files should
+% be included in EPS format.
+%
+% If you use the hyperref package, please uncomment the following line
+% to display URLs in blue roman font according to Springer's eBook style:
+%\renewcommand\UrlFont{\color{blue}\rmfamily}
+
+\begin{document}
+%
+\title{
+Intmax2: A ZK-rollup with Minimal Onchain Data and Computation Costs Featuring Decentralized Aggregators
+}
+%
+\titlerunning{Intmax2}
+% If the paper title is too long for the running head, you can set
+% an abbreviated paper title here
+%
+%\author{
+%Erik Rybakken\inst{1} 
+%\and
+%Leona Hioki\inst{1}
+%\and
+%Mario Yaksetig\inst{2}
+%}
+\author{}
+%
+%\authorrunning{E. Rybakken et al.}
+% First names are abbreviated in the running head.
+% If there are more than two authors, 'et al.' is used.
+%
+%\institute{
+%Intmax
+%\\
+%\email{paper@intmax.io}
+%\and
+%University of Porto
+%}
+\institute{}
+%
+\maketitle              % typeset the header of the contribution
+%
+\begin{abstract}
+We present a novel blockchain scaling solution called Intmax2, which is a Zero-Knowledge rollup (ZK-rollup) protocol featuring stateless and decentralized block production, while minimizing the usage of data and computation on the underlying blockchain. Our architecture distinctly diverges from existing ZK-rollups since essentially all of the data and computational costs are shifted to the client-side as opposed to imposing heavy requirements on the block producers or the underlying Layer 1 blockchain. The only job for block producers is to periodically generate a commitment to a set of transactions, distribute inclusion proofs to each sender, and collect and aggregate signatures by the senders. This design allows permissionless and stateless block production, and is highly scalable with the number of users.
+\keywords{Zero-Knowledge Proofs  \and Stateless ZK-Rollup \and Blockchain Scaling}
+\end{abstract}
+%
+%
+%
+
+% Introduction
+\section{Introduction}
+    \input{sections/introduction}
+
+\section{Preliminaries}
+    \input{sections/background}
+
+%\section{Important Definitions}
+    \input{sections/breakdown}
+
+
+%\section{Protocol Description}
+%    \input{sections/protocol_description}
+
+%\section{Extensions}
+    
+%\section{Implementation}
+
+\section{Conclusion}
+    \input{sections/conclusion}
+
+\clearpage
+% ---- Bibliography ----
+\bibliographystyle{splncs04}
+\bibliography{references}
+
+\appendix
+
+\include{sections/discussion}
+
+\include{sections/security_analysis}
+
+\include{appendix/security_proof}
+
+%\include{appendix/previousworks}
+\end{document}

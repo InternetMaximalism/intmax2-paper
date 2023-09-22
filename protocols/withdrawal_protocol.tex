@@ -1,0 +1,39 @@
+\begin{Protocol*}[h!]
+\begin{mdframed}
+
+\fontsize{10pt}{2cm}
+
+\textbf{Withdrawing funds} 
+\smallbreak
+
+To withdraw funds, user Alice performs the following steps:
+
+
+\begin{itemize}
+    \setlength\itemsep{0.15em}
+
+    \item Alice sends in a transfer block the desired amount to be withdrawn from her L2 account to the rollup account representing her L1 account
+
+    \item Alice produces a zero knowledge proof $P$ that proves that the rollup account representing her L1 account has a certain balance at a previous index of the rollup: $\mathsf{Prove}(pp, x, w) \rightarrow P$.
+
+    \item Alice submits the balance proof \(P\) to the withdrawal function in the rollup contract.
+\end{itemize}
+
+Upon receiving the proof, the withdrawal function performs the following steps:
+
+\begin{itemize}
+    \setlength\itemsep{0.15em}
+
+    \item Withdrawal function verifies that the zero-knowledge proof verification outputs true: $\mathsf{Verify}(pp, x, P) \rightarrow \mathsf{Accept}$
+
+    \item Checks the provided rollup hash is in the list of previous rollup hashes.
+
+    \item Transfers to the L1 account (on L1) the difference between the proven balance of the rollup account representing her L1 address and the amount that has previously been withdrawn to the L1 address, and updates the total amount withdrawn to the L1 address accordingly in the contract storage.
+\end{itemize}
+
+It is important to note that if a specific use case allows for the constant use of the funds in the rollup, then a user does not necessarily have to withdraw funds from the rollup and can constantly use the existing funds and subsequently deposit (or receive) funds on an ongoing basis. 
+
+\normalsize	
+\end{mdframed}
+\caption{Withdrawal Protocol.\label{box:withdrawal}}
+\end{Protocol*}

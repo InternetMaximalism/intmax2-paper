@@ -1,0 +1,17 @@
+\section{Informal Security Notes}
+
+In this section, we briefly discuss the security aspects of the proposed construction, focusing on liveness, safety, and user assumptions.
+
+\subsection{Liveness}
+One of the key features of the proposed construction is its liveness, which allows any participant to become an aggregator. This decentralized approach ensures that transaction processing and updates can continue even in the absence or unavailability of a specific aggregator. The ability for users to readily assume the role of the aggregator promotes a distributed and collaborative environment, enhancing the system's resilience and adaptability.
+
+\subsection{Safety}
+Our construction also emphasizes strong safety properties, particularly in preventing unauthorized fund access. The system ensures that funds cannot be stolen by unauthorized parties, as users must provide valid proofs of balance to authorize transactions. Moreover, the completeness property guarantees that users can always withdraw their funds to the underlying blockchain.
+
+\subsection{Malicious Users}
+Users can choose to not sign the Merkle root of the tree of transactions. Failure to do so results in a situation where the user's transaction is effectively voided, preventing them from proving its existence in the corresponding zero-knowledge proofs used for withdrawals. Similarly, if the aggregator fails to send the Merkle proof to a specific user, the user's transaction will not be counted as included in that set. As a consequence, the user will not be able to prove the transaction's validity in zero-knowledge, preventing them from claiming any funds associated with that (voided) transaction.
+
+Alternatively, a user may attempt to spam the network with a very high number of dummy (invalid) transactions to attempt to increase the size of the Merkle proofs that are sent to each user in an attempt to bloat the local storage of individual users. This attack, however, requires exponential effort from the attacker as the Merkle proof size is logarithmic in the number of leaves. 
+
+%\subsection{Offline Users}
+%In the event where a user is offline for an extended period of time, and does not continuously update their recursive zero-knowledge proof according to the latest batch, they must resynchronize by obtaining the sequence of the posted batch updates since last online and update their recursive zero-knowledge proof to match the last batch state. 

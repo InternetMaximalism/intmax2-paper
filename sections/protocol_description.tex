@@ -1,0 +1,25 @@
+
+In Intmax2, we leverage the use of recursive zero-knowledge proofs to shift the computationally expensive part of the zk-rollups to the user side. As a result, we obtain a more lightweight aggregator (or validator). A side effect of this design decision is that the aggregator role is easily decentralizable. 
+
+In our proposed protocol, there are two roles running simultaneously. The role of a user and the role of the aggregator. We highlight, however, that since the aggregator is easily decentralizable, a user can become an aggregator, thus ensuring the continuous operation and liveness of the system.
+
+\paragraph{Aggregator Role.}
+In Intmax2, the aggregator plays a crucial role in the transaction processing and updating of the underlying layer 1. The aggregator is responsible for collecting and batching user transactions into batches, which are subsequently posted to the underlying layer 1. By doing so, the aggregator facilitates the efficient and secure execution of transactions in the system.
+
+\paragraph{User Role.}
+In Intmax2, users are involved in transacting funds. To do so, users must perform a sequence of steps. First, a user must register a (BLS) public key. Upon registration, to start transacting, a user must deposit funds into their account. Once a successful deposit occurs, a user is able to transfer funds to other users. Finally, users can perform withdrawals. 
+
+\subsection{Registration}
+    \input{protocols/registration_protocol}
+
+\subsection{Deposit}
+    \input{protocols/deposit_protocol}
+
+\clearpage
+\subsection{Transfer}
+    \input{protocols/transfering}
+
+\subsection{Withdrawal}
+    \input{protocols/withdrawal_protocol}
+
+    

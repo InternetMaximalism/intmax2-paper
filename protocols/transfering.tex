@@ -1,0 +1,57 @@
+\begin{Protocol*}[ht!]
+\begin{mdframed}
+
+\textbf{Transfer}
+\smallbreak
+To perform a transfer of funds, user Alice performs the following steps:
+\vspace{-1mm}
+\begin{itemize}
+    \setlength\itemsep{0.15em}
+    
+    \item Alice creates a transaction $\mathsf{tx}$ specifying the desired transfer of funds
+
+    \item Alice sends the transaction to the aggregator
+    
+\end{itemize}
+
+The aggregator, to process a transaction, performs the following steps:
+\vspace{-1mm}
+\begin{itemize}
+    \setlength\itemsep{0.15em}
+    
+    \item The aggregator collects a set of received transactions, and produces a merkle tree containing all the corresponding transactions. 
+
+    \item The aggregator individually produces the merkle proofs of inclusion for each transaction in the included set
+    
+    \item The aggregator sends each merkle proof of inclusion to the corresponding user performing the transaction
+\end{itemize}
+
+To confirm the transaction, user Alice performs the following steps:
+\vspace{-1mm}
+\begin{itemize}
+    \setlength\itemsep{0.15em}
+    
+    \item Alice checks that the merkle proof of inclusion is correct.
+
+    \item Alice signs the merkle root of the tree. This is to confirm that the tree contains her transaction.
+    
+    \item Alice sends the signed merkle root to the aggregator. 
+\end{itemize}
+
+The aggregator, to finalize a set of transactions, performs the following steps:
+\vspace{-1mm}
+\begin{itemize}
+    \setlength\itemsep{0.15em}
+    
+    \item The aggregator collects the set of received signatures on the produced merkle root.
+
+    \item The aggregator aggregates the received signatures into a single aggregated signature and obtains a finalized set of transactions, which comprises the merkle root and the aggregated signature on such root. This finalized set of transactions is referred to as the transfer block since it contains a block of transfers (or transactions). 
+    
+    \item The aggregator submits the transfer block to the rollup smart contract. 
+\end{itemize}
+
+We highlight that the transfer block does not need to contain the actual transactions as the proofs for inclusion of the transactions have been shared with each individual user. Therefore, only the merkle root and the signature are posted on the underlying L1, thus resulting in an approach that is very data-efficient, unlike traditional zk-rollup approaches.
+
+\end{mdframed}
+\caption{Transfer Protocol.\label{alg:transfering}}
+\end{Protocol*}

@@ -1,0 +1,22 @@
+\begin{Protocol*}[h]
+\begin{mdframed}
+
+
+\textbf{Prove Balance}\\
+To prove that there is a certain balance in a specific account, user Alice performs the following steps:
+
+\begin{enumerate}
+
+\item Alice, every time she sends a transaction keeps a proof of inclusion of specific transaction in a set of transactions. This set of transactions is stored in the form of a merkle tree and the corresponding root is signed by each sender involved in the set of transactions. 
+
+\item Alice calculates a recursive zero-knowledge proof of her account balance. 
+
+% \item Alice sends the zero knowledge proof to the recipient offchain, who will verify
+
+
+
+\end{enumerate}
+\normalsize	
+\end{mdframed}
+\caption{Adding batches to rollup Protocol.\label{alg:adding}}
+\end{Protocol*}

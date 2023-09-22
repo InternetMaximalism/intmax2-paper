@@ -1,0 +1,30 @@
+
+\subsection{Zero-knowledge proofs}
+
+Zero-knowledge proofs, introduced in~\cite{zkp}, allow a prover $\mathcal{P}$ to prove to a verifier $\mathcal{V}$ a relation between a statement $x$ and a witness $w$. A non-interactive zero-knowledge (NIZK) proof is a trio of algorithms: 
+
+\begin{itemize}
+  \setlength\itemsep{0.35em}
+
+    \item $\mathsf{Setup}(\lambda) \rightarrow pp$. For a certain security parameter $\lambda$, the setup algorithm outputs $pp$, the public parameters of the system. 
+    \item $\mathsf{Prove}(pp, x, w) \rightarrow P$. Given the system's public parameters $pp$, a statement $x$, and a witness $w$, issue a proof $P$.
+    \item $\mathsf{Verify}(pp, x, P) \rightarrow \mathsf{Accept/Reject}$. Upon receiving the public parameters $pp$, the public statement $x$ and the proof $P$, the verifier $\mathcal{V}$ either accepts or rejects the proof depending on whether or not $P$ is well-formed. In this case well-formed implies the successful proof of the relation between the statement $x$ and the witness $w$. 
+\end{itemize}
+
+\subsubsection{Properties.} A zero-knowledge proof scheme is considered sound if an adversary $\mathcal{A}$ attempting to prove the statement without knowing the secret witness $w$ cannot produce a valid proof with probability greater than $2^{-k}$ for knowledge error $k$. A zero knowledge proof scheme is considered complete if there is a guarantee that if the prover and verifier are honest, then the verifier successfully accepts a proof that shows that the prover $\mathcal{P}$ knows the witness $w$. Additionally, a proof $P$ is considered a proof-of-knowledge if the prover $\mathcal{P}$ must know the witness $w$ to compute the proof for the pair $(x, w)$, and such proof-of-knowledge is considered zero knowledge if the proof $P$ reveals nothing about the witness $w$. Additionally, if the scheme produces succinct arguments, then it is a (zk)SNARK~\cite{supersonic,marlin,plonk,groth16,sonic}. Quantum-secure similar constructions exist, as in~\cite{zkstarks,pq_zk}.
+
+\subsection{BLS Signatures}
+
+The BLS signature scheme~\cite{bls} operates in a prime order group and supports signature aggregation. The scheme uses a bilinear pairing $e: \mathbb{G}_{0} \times \mathbb{G}_{1}\rightarrow \mathbb{G}_{T}$. This pairing is efficiently computable, non-degenerate, and all the three groups have prime order $q$. We assume $g_{0}$ to be the generator of group $\mathbb{G}_{0}$ and $g_{1}$ to be the generator of group $\mathbb{G}_{1}$. Moreover, this signature scheme uses a hash function $\mathcal{H}: \mathcal{M} \rightarrow \mathbb{G}_{0}$. The scheme is defined by the trio of algorithms:
+
+\begin{itemize}
+  \setlength\itemsep{0.35em}
+
+    \item $\mathsf{KeyGen}(\lambda) \rightarrow (sk, pk)$. The secret key is a random value $\mathsf{sk} \xleftarrow[]{R}\mathbb{Z}_{q}$ and the public key is $pk \leftarrow g_{1}^{\mathsf{sk}} \in \mathbb{G}_{1}$
+    \item $\mathsf{Sign}(sk, m) \rightarrow \sigma$. The signature is a group element $\sigma \leftarrow \mathcal{H}_{0}(m)^{\mathsf{sk}} \in \mathbb{G}_{0}$.
+    \item $\mathsf{Verify}(pk, m, \sigma) \rightarrow \mathsf{Accept/Reject}$. If $e(g_1, \sigma) = e(pk, \mathcal{H}(m))$ output accept, otherwise output reject.
+\end{itemize}
+
+\subsubsection{Signature Aggregation.} Given triples $(pk_{i}, m_{i}, \sigma_{i})$ for $i=1, ..., n$, where n is the number of signers, anyone can aggregate signatures $\sigma_{1}, \dots, \sigma_{n}\in \mathbb{G}_{0}$.
+
+\subsubsection{Rogue public-key attack.} This signature aggregation method is, however, insecure due to an attack where and adversary $\mathcal{A}$ registers a maliciously crafted public key that then allows for the adversary to claim that an unsuspecting user, Bob, also signed a specific message. 

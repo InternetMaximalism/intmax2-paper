@@ -1,0 +1,20 @@
+\section{Update from the previous works}
+\begin{previousworks}
+
+The design described in this paper builds upon the original Intmax (Intmax 1) design \cite{intmax}, and extends it in two ways. First and foremost, we enable many independent trustless aggregators working in parallel, which increases availability and censorship-resistance of the rollup. Second, as a by-product, we decrease the finalization time for transactions, which is the time between initiating a payment and guaranteeing that the payment has succeeded and cannot be reverted.
+In the original Intmax design, the aggregator maintains some global state that is used when the aggregator makes new rollup batches. This state is not
+necessarily known by anyone other than the aggregator, and can be withheld by the aggregator. This means that if we want to allow multiple aggregators
+for the rollup, each aggregator must be trusted to
+provide the updated rollup state offchain to the next
+aggregator in order to keep the rollup alive. This
+means two things. First, since each aggregator needs
+to build upon the previous block, this method requires the complexity of a leader selection method to determine which aggregator can create the next
+batch. Second, and more importantly, the rollup will halt if one of the aggregators fails to provide the data to the next aggregator, and all users would need to exit the rollup. This means that all aggregators need
+to be trusted in order to guarantee liveliness.
+
+The design described in this paper solves these problems by modifying the protocol so that block production becomes stateless, meaning that new blocks can be added to the rollup without having to know the previous blocks at all, allowing aggregating to become decentralized. In order to achieve this, we
+leveraged recursive zero knowledge proofs.
+
+
+
+\end{previousworks}

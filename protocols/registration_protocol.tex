@@ -1,0 +1,39 @@
+\begin{Protocol*}[h]
+\begin{mdframed}
+
+%\footnotesize
+\fontsize{10pt}{2cm}
+
+% == 
+
+\begin{center}
+    \textbf{Registration}
+\end{center}
+
+\smallbreak
+
+Before a user can transact on the rollup, user Alice must register a BLS public key. To do so, user Alice performs the following steps:
+
+\begin{itemize}
+  \setlength\itemsep{0.25em}
+
+    \item Alice generates a BLS secret key $x \xleftarrow[]{R} \mathbb{Z}_{q}$
+    
+    \item Alice obtains the corresponding public key $pk \xleftarrow[]{} g_{1}^{x} \in \mathbb{G}_{1}$
+
+    \item Alice produces a signature $\sigma \xleftarrow[]{}\mathcal{H}(m)^{x} \in \mathbb{G}_{0}$, where \(m\) is the message ``I am registering the BLS public key \emph{pk} on Intmax2", which is a registration message exclusive to Alice and is cryptographically binding.
+
+    \item Alice outputs the following registration block: $(pk, \sigma)$
+
+\end{itemize}
+
+Upon successful registration, an L2 address is assigned to Alice.
+\smallbreak
+In this step, the signature proves that each user knows the private key corresponding to their public key, preventing the rogue key attack on BLS signatures. When a user registers a new account, the account is given an L2 address, which is an integer that increments for each new account.
+
+
+\normalsize	
+\end{mdframed}
+\caption{Registration Protocol.
+\label{alg:reg}}
+\end{Protocol*}

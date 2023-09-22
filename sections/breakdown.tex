@@ -1,0 +1,418 @@
+\section{Transaction map sequences}\label{section:transaction-map-sequences}
+
+In this section we will describe transaction maps, which are collections of transactions, and sequences of such transaction maps, in which anyone can compute the balances of any account. We let \((Amounts, +, \leq)\) be a partially ordered abelian group of amounts.\footnote{For simplicity, the reader can just assume \(Amounts = \mathbb{Z},\) which gives a system that only supports one token. In practice, however, we would like to support multiple tokens, which can be done by letting \(Amounts\) be the set of functions \(f : Tokens \to \mathbb{Z},\) where \(Tokens\) is a set of tokens, the group operation is element-wise addition and where for functions \(f,g : Tokens \to \mathbb{Z}\) we have \(f \leq g\) if and only if \(f(t) \leq g(t), \forall t \in Tokens\).} We also have a set \(Accounts\) of accounts, with a designated \(source \in Accounts\) which will be the only account allowed to have negative balances. In the final rollup design, the source account will be used to deposit funds from the underlying blockchain to the rollup.
+
+\begin{defn}[Transaction]
+  A \emph{transaction}\footnote{In practice, transactions should also contain a nonce to prevent replay attacks. For the sake of simplicity we will not deal with this issue here, but we note that it can easily be added.} is a function \[t : Recipients(t) \rightarrow Amounts^+\] which maps a finite set \(Recipients(t) \subset Accounts\) of \emph{recipients} to the amount received by each recipient. Here, \(Amounts^+ \subset Amounts\) is the set of all \(amount \in Amounts\) where \(amount \geq 0\).
+\end{defn}
+
+A transaction does not include a sender. Instead, we will collect transactions from different senders together in \emph{transaction maps}.
+
+\begin{defn}[Transaction map]
+  A \emph{transaction map} is a function \[T : Senders(T) \rightarrow \mathcal{T}\] which maps a finite set \(Senders(T) \subset Accounts\) of \emph{senders} to the transaction sent by each sender. \footnote{Notice that this definition enforces that each sender can only send one transaction in each transaction map, but this is not a limitation since each transaction can have an unlimited number of recipients.}
+\end{defn}
+
+We get the total amount sent and received by an account in a transaction map as follows.
+
+\begin{defn}[Amount sent and received in a transaction map]
+Let \(T\) be a transaction map. For each \(a \in Accounts\) we define \[sent(T,a) = \begin{cases}
+  \sum_{r \in Recipients(T(a))} T(a)(r), & \text{if } a \in Senders(T) \\
+  0, \text{otherwise} \\
+  \end{cases}\] and
+  \[received(T,a) = \sum_{\substack{s \in Senders(T), \\
+  a \in Recipients(T(s))}} T(s)(a).\]
+\end{defn}
+
+The balance of an account in a sequence of transaction maps is defined as the total amount received minus the total amount sent in the sequence.
+
+\begin{defn}[Balance]
+  Let \(T_* = (T_i)_{i=1}^N\) be a sequence of transaction maps. For all \(0 \leq i \leq N\) and \(a \in Accounts\) we define the \emph{balance of \(a\) in \(T_*\) at index \(i\)} to be \[Bal_i(T_*,a) = \sum_{j=1}^i received(T_j,a) - \sum_{j=1}^i sent(T_j,a).\] For simplicity, when \(i=N\) we will omit the index and write \(Bal(T_*,a) = Bal_N(T_*,a),\) which we simply call the \emph{balance of \(a\) in \(T_*\)}.
+\end{defn}
+
+To prevent accounts from overspending, we will require that every non-source account has positive balances.
+
+\begin{defn}[Account with positive balances]
+  An account \(a \in Accounts\) has \emph{positive balances in a transaction map sequence} \(T_*\) if \(Bal_i(T_*,a) \geq 0\) for all \(i\). If every non-source account has positive balances in \(T_*\), we will say that \(T_*\) is \emph{balance-positive}.
+\end{defn}
+
+\begin{prop}\label{theorem:only-need-to-check-for-positive-balance-when-sending-transactions}
+  An account \(a \in Accounts\) has positive balances in a transaction map sequence \(T_*\) iff \(Bal_i(T_*,a) \geq 0\) for all \(i\) where \(a \in Senders(T_i)\).
+\end{prop}
+
+\begin{proof}
+  This follows because an account balance can only decrease and become negative at the transaction maps where the account sent a transaction.
+\end{proof}
+
+\section{Proving balances from partial transaction data}\label{section:balance-proofs}
+
+If a transaction map sequence \(T_*\) is publicly known, every user can compute their balances in it. Now, the question is, can we reduce the amount of data that needs to be public? For instance, can we have only a \emph{commitment}, e.g. a merkle root, of each transaction map in \(T_*\) be publicly known, and then having each user prove that they have a certain balance by providing a transaction map sequence \(T'_* = (T'_i)_{i=1}^N\) together with inclusion proofs that prove that each \(T'_i\) is a restriction of \(T_i\)? It is clear that the balance of an account in such a sequence \(T'_*\) can only be a lower bound on the account's balance in \(T_*\) if all transactions previously sent by the account in \(T_*\) are included in \(T'_*\) (otherwise, a user could just omit their sent transactions to get an artificially high balance). To be able to verify that \(T'_*\) includes all transactions previously sent by the account in \(T_*\), the set of senders in each transaction map in \(T_*\) must also be publicly known. In summary, we will replace a transaction map sequence with a sequence of transaction map commitments and associated sender sets. To define this, we will first define transaction map commitments.
+
+\subsection{Transaction map commitments}
+
+For committing to a transaction map, we will need a commitment scheme that takes a transaction map \(T\) and returns a commitment \(C \in \mathcal{C}\) in a set \(\mathcal{C}\) of possible commitments, and inclusion proofs \(\pi(s) \in \Pi\) in a set \(\Pi\) of possible inclusion proofs for every sender \(s \in Senders(T)\). The commitment scheme has a verifying function, which takes a transaction, a sender, a commitment and an inclusion proof, and returns \emph{true} if the inclusion proof is valid and \emph{false} otherwise. The commitment scheme must be \emph{binding}, in the sense that it should be computationally infeasible to construct valid inclusion proofs of two different transactions by the same sender in a transaction map. We can realize such a commitment scheme by having the commitment for a transaction map \(T\) be the merkle root of a merkle tree which stores for each \(s \in Senders(T)\) a hash of the transaction \(T(s)\) at the leaf whose merkle path is determined by \(s\).\footnote{Note that it is possible to construct an invalid merkle tree, where some of its leaves are not valid transactions, but this would not be an issue since the binding property still holds in this case. We also note that KZG commitments can be used instead of merkle trees.}
+
+\begin{defn}[Simple block]
+  A \emph{simple block} is a tuple \((S,C)\), where \(S \subset Accounts\) is a finite set of accounts called the \emph{senders} of the simple block, and \(C \in \mathcal{C}\) is a transaction map commitment.
+\end{defn}
+
+In practice, the senders in a simple block must have signed the corresponding transaction map commitment, which we will explain in \Cref{section:signatures}. Signing the transaction map commitment serves as a confirmation that the sender intended to send their transaction in the committed transaction map, and it also provides a way to guarantee that honest users will always have inclusion proofs for their transactions, since they can refuse to sign the commitment if they don't have an inclusion proof of their transaction.
+
+\subsection{Local views and explicit balance proofs}
+
+A \emph{local view} of a simple block sequence is a transaction map sequence together with inclusion proofs that the transactions are in the simple block sequence.
+
+\begin{defn}[Local view of a simple block sequence]
+  Let \(B_* = ((S_i,C_i))_{i=1}^N\) be a simple block sequence. A \emph{local view} of \(B_*\) is a tuple \((T_*, \pi_*(*))\) where \(T_* = (T_i)_{i=1}^N\) is a transaction map sequence such that \(Senders(T_i) \subset S_i\) for all \(i\), and \[\pi_*(*) = \bigl(\pi_i(s)\bigr)_{1 \leq i \leq N,\ s \in Senders(T_i)}\] is an indexed family of inclusion proofs where each \(\pi_i(s)\) is a valid inclusion proof of transaction \(T_i(s)\) by sender \(s\) in the commitment \(C_i\).
+\end{defn}
+
+When the context is clear, we will abuse the terminology and identify a local view \((T_*,\pi_*(*))\) with its transaction map sequence \(T_*\). For instance, we will say that an account has \emph{positive balances} in the local view and that a local view is \emph{balance-positive} if the same things can be said about its transaction map sequence. As previously mentioned, a requirement for being able to prove a lower bound on the balance of an account in a simple block sequence \(B_*\) from a local view, is that it contains every transaction previously sent by the account in \(B_*\).
+
+\begin{defn}[Valid balance]
+  Let \((T_*, \pi_*(*))\) be a local view of a simple block sequence \(B_* = ((S_i,C_i))_{i=1}^N\), let \(a \in Accounts\) and \(0 \leq i \leq N\). The account \(a\) is said to have a \emph{valid balance at index \(i\) in the local view} if we have \(a \notin S_j \backslash Senders(T_j)\) for all \(j \leq i\). If the account has valid balance at every index \(i\) where \(a \in Senders(T_i)\), the account is said to have a \emph{valid transaction history in the local view}. If every account has a valid transaction history in the local view, we will say that \emph{the local view has valid transaction histories}.
+\end{defn}
+
+If a local view of a simple block sequence is both balance-positive and has valid transaction histories, it can be used to prove the balance of an account in the simple block sequence. These proofs will be called \emph{explicit balance proofs} (which will later be replaced by ZK balance proofs).
+
+\begin{defn}[Explicit balance proof]
+  Let \(B_* = ((S_i,C_i))_{i=1}^N\) be a simple block sequence. A local view \(p = (T_*, \pi_*(*))\) is called an \emph{explicit balance proof} if it has valid transaction histories and is balance-positive. If an account \(a \in Accounts\) has a valid balance in \(T_*\) at index \(i\), we will call \(p\) an \emph{explicit proof} that the balance of \(a\) in \(B_*\) at index \(i\) is \(Bal_i(T_*,a)\).
+\end{defn}
+
+ We will now prove some important facts about local views, culminating in a soundness theorem for explicit balance proofs. The first fact is that we cannot increase the balance of an account in a local view by removing some of the transactions in the local view.
+
+\begin{prop}\label{theorem:balance-inequalities}
+  Let \(B_* = ((S_i,C_i))_{i=1}^N\) be a simple block sequence and let \((T_*, \pi_*(*))\) and \((T'_*, \pi'_*(*))\) be local views of \(B_*\) where each \(T'_i\) is a restriction of \(T_i\). Then, if \(a \in Account\) has a valid balance at an index \(i\) in \(T'_*\), the account also has a valid balance at \(i\) in \(T_*\), and we have \(Bal_i(T'_*,a) \leq Bal_i(T_*,a).\)
+\end{prop}
+
+\begin{proof}
+  We first show that the account has a valid balance at index \(i\) in \(T_*\). This follows because if \(a \notin S_j \backslash Senders(T_j)\) for some \(j \leq i\), we also have \(a \notin S_j \backslash Senders(T'_j)\), since \(T'_j\) is a restriction of \(T_j\). To prove the inequality, since each \(T'_j\) is a restriction of \(T_j\) we have \(received(T'_j,a) \leq received(T_j,a)\) and \(sent(T'_j,a) = sent(T_j,a)\) for all \(j \leq i\), so we get
+  \begin{align*}
+      Bal_i(T'_*,a) &= \sum_{j=1}^i received(T'_j,a) - \sum_{j=1}^i sent(T'_j,a) \\
+      &\leq \sum_{j=1}^i received(T_j,a) - \sum_{j=1}^i sent(T_j,a) \\
+      &= Bal_i(T_*,a).
+  \end{align*}
+\end{proof}
+
+Local views can be combined to form a greater local view.
+
+\begin{defn}[The combination of local views]
+  Let \((T^1_*, \pi^1_*(*))\) and \((T^2_*, \pi^2_*(*))\) be two known local views for a simple block sequence. Since the commitment scheme is binding, we have that for each \(i\), the transaction maps \(T^1_i\) and \(T^2_i\) and the families of inclusion proofs \(\pi^1_i(*)\) and \(\pi^2_i(*)\) agree on their common intersections\footnote{Technically speaking, for this to be true, we must either have that the chosen commitment scheme has at most one inclusion proof for a transaction in a transaction map, or we can instead consider \emph{equivalence classes} of inclusion proofs, where two valid inclusion proofs of the same transaction by the same sender are equivalent.}. Then, the \emph{combination of the two local views} is defined as the local view \((T_*, \pi_*(*)),\) where for each \(i\) we let \(T_i\) and \(\pi_i(*)\) be resp. the unique extensions of \(T^1_i\) and \(T^2_i\), and of \(\pi^1_i(*)\) and \(\pi^2_i(*)\), to the union of their domains.
+\end{defn}
+
+The properties of local views are preserved when taking combinations.
+
+\begin{prop}\label{theorem:joining-transaction-maps}
+  Let \((T_*, \pi_*(*))\) be the combination of two local views \((T^1_*, \pi^1_*(*))\) and \((T^2_*, \pi^2_*(*))\) of a simple block sequence. Then we have the following.
+  
+  \begin{description}
+      \item[a)] If an account has valid transaction histories in \(T^1_*\) and \(T^2_*\), then the account also has a valid transaction history in \(T_*\).
+      \item[b)] If the account in addition has positive balances in \(T^1_*\) and \(T^2_*\), then the account also has positive balances in \(T_*\).
+  \end{description}
+\end{prop}
+
+\begin{proof}
+  Let \(a \in Accounts\) be an account with valid transaction histories in both \(T^1_*\) and \(T^2_*\), and let \(i\) be an index where \(a \in Senders(T_i)\). Then we have either \(a \in Senders(T^1_i)\) or \(a \in Senders(T^2_i)\), which means that the account has a valid balance at index \(i\) in either \(T^1_*\) or \(T^2_*\). Let \(T'_*\) be the one in which the account has valid balance at index \(i\). It follows from \Cref{theorem:balance-inequalities}, using \(T'_*\) and \(T_*\), that the account has valid balance in \(T_*\) at index \(i\). For part b) the assumption gives us that \(a\) has positive balance at index \(i\) in \(T'_*\), so \Cref{theorem:balance-inequalities} also gives us
+  \(Bal_i(T_*,a) \geq Bal_i(T'_*,a) \geq 0.\)
+  By \Cref{theorem:only-need-to-check-for-positive-balance-when-sending-transactions}, we only needed to check for positive balances for the indices where the account sent a transaction, which we have now done.
+\end{proof}
+
+\begin{cor}
+  The combination of explicit balance proofs is again an explicit balance proof.
+\end{cor}
+
+We will now show that is infeasible to construct an explicit proof of a balance which is greater than the true balance of an account.
+
+\begin{theorem}[Soundness of explicit balance proofs]\label{theorem:explicit-proof-soundness}
+Let \(B_*\) be a simple block sequence and let \((T_*,\pi_*(*))\) be the explicit balance proof for \(B_*\) obtained by combining all explicit balance proofs for \(B_*\) that are collectively known (i.e. known by someone). Then, if a user has an explicit balance proof \((T'_*, \pi'_*(*))\) for \(B_*\), we have \(Bal_i(T'_*,a) \leq Bal_i(T_*,a)\) for every \(a \in Accounts\) and every \(i\) where the account has a valid balance in \(T'_*\). In other words, the balance of an account cannot be proven to be larger than its balance in \(T_*\), which we consider to be the \emph{true balance} of the account.
+\end{theorem}
+
+\begin{proof}
+  We clearly have that each \(T'_i\) is a restriction of \(T_i\), since if an explicit balance proof is known by one user, it is also known collectively. Then, the result follows from \Cref{theorem:balance-inequalities}.
+\end{proof}
+
+\subsection{Constructing balance proofs and completing transactions}
+
+In order for a transaction recipient to be able to add the received amount to their balance, the sender must complete the transaction by sending an inclusion proof and a validity proof, i.e. a proof that the sender had sufficient balance for sending the transaction, to the recipient. The validity proof can simply be an explicit proof of the sender's balance after sending the transaction.
+
+\begin{defn}[Transaction validity proof]
+  An \emph{explicit validity proof} of the transaction in a simple block sequence \(B_* = ((S_i,C_i))_{i=1}^N\) by a sender \(s \in Senders(T_i)\) is an explicit balance proof of the sender's balance at index \(i\).
+\end{defn}
+
+In practice, however, we will replace explicit balance and transaction validity proofs with corresponding \emph{ZK-proofs}, which we will define later. We will now talk about balance and validity proofs in general, before we specialize to explicit proofs and ZK-proofs.
+
+\begin{defn}[Completed transaction]
+  A transaction is said to be (explicitly or ZK) \emph{completed} if every recipient has received an inclusion proof and a (explicit or ZK) validity proof of it.
+\end{defn}
+
+If a user knows inclusion proofs for every transaction they have sent, as well as enough completed transactions received to get sufficient balance for every sent transaction, they can construct balance proofs for their account, which can then be sent (together with inclusion proofs) to the recipients of each sent transaction in order to complete them. In details, the user needs the following data to prove their balances.
+
+\begin{defn}[Data set for constructing balance proofs for an account]
+   A \emph{data set for constructing (explicit or ZK) balance proofs for an account \(a \in Accounts\) in a simple block sequence \(B_* = (B_i)_{i=1}^N\)} is a tuple \((T_*,\pi_*(*), p_*(*)),\) where \((T_*,\pi_*(*))\) is a local view of \(B_*\) and where \[p_*(*) = \bigl(p_i(s)\bigr)_{1 \leq i \leq N,\ s \in Senders(T_i) \backslash \{a\}}\] is an indexed family of (explicit or ZK) transaction validity proofs where each \(p_i(s)\) is a validity proof of the transaction by \(s\) at index \(i\) in \(T_*\). The data set is said to be \emph{complete} if \(a\) has positive balances in \(T_*\), and if \(T_*\) contains every transaction sent by \(a\) in \(B_*\).
+\end{defn}
+
+Each user will know a data set for their account which consists of every completed transaction received by the account (whose inclusion and validity proofs are known to the user by definition), as well as every transaction sent by the account whose inclusion proofs are known by the user. In order for this data set to be complete, the user should obey the following rule.
+
+\begin{defn}[Signing rule]
+  Let \(B_*\) be a simple block sequence. A user \emph{obeys the signing rule} if they never sign a transaction map commitment unless the following conditions are met.
+\begin{enumerate}
+    \item The user knows an inclusion proof of a transaction sent by their account in the committed transaction map
+    \item The user has no pending transactions, meaning that \(B_*\) contains all transaction map commitments that the sender has signed.\footnote{This condition can be relaxed to requiring that the account has sufficient balance for \emph{all} of its pending transactions including the new transaction.}
+    \item The user's account has sufficient balance for the new transaction according to the data set for the account known by the user.
+\end{enumerate}
+\end{defn}
+
+\begin{theorem}\label{theorem:protocol-rule-implies-preconditions}
+  If the owner of an account obeys the signing rule,\footnote{We must also suppose, since we have omitted transaction nonces for simplicity, that there hasn't been any replay attacks, meaning that all commitments in the simple block sequence are unique. If nonces are implemented, we do not need this requirement.} the data set for the account known by the owner is complete.
+\end{theorem}
+
+\begin{proof}
+  Let \(B_*\) be the simple block sequence and \((T_*,\pi_*(*), p_*(*))\) be the data set for an account \(a \in Accounts\) known by its owner at the time of signing a transaction map commitment. We observe that there will be no transactions sent by \(a\) in \(B_*\) from the time when the commitment was signed by the sender, to the time when the new commitment is included in \(B_*\). This means that the balance \(Bal(T_*,a)\) cannot decrease while the new transaction is waiting to be included. Since this balance was sufficient for the new transaction at the time the commitment was signed, it will still be sufficient by the time the new transaction is included in \(B_*\).
+\end{proof}
+
+We will now show how to construct explicit balance and transaction validity proofs from a complete data set.
+
+\begin{theorem}\label{theorem:proof-of-balance-in-honest-transaction-map-sequence}
+  Let \(B_*\) be a simple block sequence, and suppose we know a complete data set \((T_*,\pi_*(*), p_*(*))\) for generating the explicit balance proofs for an account \(a \in Accounts\). Then we will be able to generate an explicit balance proof that the balance of \(a\) at each index \(i\) in \(B_*\) is at least \(Bal_i(T_*,a)\). We will also be able to explicitly complete all transactions sent by \(a\) in \(B_*\).
+\end{theorem}
+
+\begin{proof}
+  We will construct the local view \(p' = (T'_*,\pi'_*(*))\) of \(B_*\) by combining the explicit validity proofs \(p_*(*)\) with the local view \((T_*,\pi_*(*))\). We will show that this combined local view is an explicit balance proof, meaning that it has valid transaction histories and is balance-positive. We first show that \(T'_*\) has valid transaction histories. To do this, we first observe that \(p'\) can also be constructed by taking the combination of the local views in \(\pi_*(*)\) and the local view \((T^{sent}_*, \pi^{sent}_*(*))\) where we have restricted \(p\) to just the transactions sent by \(a\). Then, since every local view in \(\pi_*(*)\) as well as \((T^{sent}_*, \pi^{sent}_*(*))\) have valid transaction histories, the combination also has valid transaction histories by \Cref{theorem:joining-transaction-maps}. We then show that every non-source account has positive balances in \(T'_*\). Let \(a' \in Accounts \backslash \{source\}\). Then, if \(a' = a\) we have that \(a'\) has positive balances in every local view in \(\pi_*(*)\), as well as in \((T_*,\pi_*(*))\), so this follows from \Cref{theorem:joining-transaction-maps}. If \(a' \neq a\), we have that \(a'\) has positive balances in every local view in \(\pi_*(*)\), as well as in \((T^{sent}_*, \pi^{sent}_*(*))\), so this also follows from \Cref{theorem:joining-transaction-maps}. We have now shown that the combined local view \(p'\) is both valid and balance-positive, and since it contains every transaction sent by \(a\) in \(B_*\) it is an explicit balance proof that the balance of \(a\) at index \(i\) in \(B_*\) is at least \(Bal_i(T_*,a)\) for every \(i\).
+\end{proof}
+
+\subsection{ZK balance proofs}
+
+Explicit balance and transaction validity proofs have several drawbacks. They use a lot of space, are expensive to verify and they leak private transaction data of the senders to the recipients. These drawbacks are solved by replacing explicit proofs with corresponding ZK-proofs. In order to be able to recursively construct these ZK-proofs and to efficiently verify them, we will not use the whole simple block sequence as public input, but instead use the \emph{hash} of the simple block sequence, which we define as follows.
+
+\begin{defn}[Hash of a simple block sequence]
+  Given a hash function \(Hash : \{0,1\}^* \rightarrow \{0,1\}^n\) and an encoding of simple blocks \(enc_{simple} : \mathcal{B}_{simple} \rightarrow \{0,1\}^*,\) we define the \emph{hash of a simple block sequence \(B_* = (B_i)_{i=1}^N\) at index \(i\)}, written \(H_i(B_*)\) inductively as follows. We define \(H_0(B_*) = Hash([0]),\) and for \(1 \leq i \leq N\) we define \(H_i(B_*) = Hash(H_{i-1}(B_*) \mathbin\Vert Hash(enc_{simple}(B_i))).\) For simplicity, we will write \(H(B_*) = H_N(B_*),\) which we call the \emph{hash of \(B_*\)}.
+\end{defn}
+
+We will use \Cref{alg:zkp-balance-computation} to prove an account's balance in a simple block sequence.\footnote{Note that the circuit only verifies that the balance of an account is \emph{at least} the purported balance, allowing for greater privacy, since a user can generate ZK balance proofs without revealing their whole balance.}
+
+\begin{circuit}[H]
+\caption{Verify the balance of an account in a simple block sequence}
+\label{alg:zkp-balance-computation}
+\begin{algorithmic}[1]
+\Public
+  \Statex a hash \(h \in \{0,1\}^n\)
+  \Statex \(account \in Accounts\)
+  \Statex \(balance \in Amounts\)
+\Private
+  \Statex a hash \(prev\_h \in \{0,1\}^n\)
+  \Statex \(prev\_balance \in Amounts\)
+  \Statex a ZK-proof \(P_{prev\_balance}\) that the balance of \(account\) at \(prev\_h\) is at least \(prev\_balance\)
+  \Statex a simple block \(B = (S,C)\)
+  \Statex a transaction map \(T\)
+  \Statex inclusion proofs \(\pi(*) = (\pi(s))_{s \in Senders(T)}\) that the transactions in \(T\) are in \(B\).
+  \Statex ZK-proofs \(P(*) = (P(s))_{s \in Senders(T) \backslash \{account, source\}}\) where each \(P(s)\) is a ZK balance proof that \(s\) has a balance of at least 0 in the simple block sequence with hash \(h\).
+\If{\(h = Hash([0])\)}
+  \State Verify \(balance = 0\)
+\Else
+  \State Verify the ZK-proofs \(P_{prev\_balance}\) and \(P(*)\), and the inclusion proofs \(\pi(*)\)
+  \State Verify \(h = Hash(prev\_h \mathbin\Vert Hash(enc_{simple}(B))\)
+  \State Verify that \(account \notin S \backslash Senders(T)\)
+  \State Verify that \(
+  balance \leq prev\_balance + received(T,account) - sent(T,account)\)
+  \State Verify \(balance \geq 0\) if \(account \neq source\)
+\EndIf
+\end{algorithmic}
+\end{circuit}
+
+\begin{defn}[ZK balance and transaction validity proof]
+  A \emph{ZK-proof} that an account \(a \in Accounts\) has a balance of at least \(b \in Amounts\) at index \(i\) in a simple block sequence \(B_*\) is a ZK-proof that \Cref{alg:zkp-balance-computation} can be satisfied with the public inputs \(h=H_i(B_*)\), \(account=a\) and \(balance=b\). A \emph{ZK validity proof} of the transaction of a sender \(s \in S_i\) at index \(i\) in \(B_*\) is a ZK-proof that the balance of the sender at index \(i\) in \(B_*\) is at least 0.
+\end{defn}
+
+\begin{theorem}[Soundness of ZK balance proofs]\label{theorem:zkp-proof-soundness}
+ Assuming soundness of the ZK scheme and collision resistance of the hash function, it is infeasible to generate a ZK-proof that the balance of an account is greater than the true balance of the account.
+\end{theorem}
+
+\begin{proof}[Idea]
+  The idea is to prove that the only way for a single prover to generate a ZK balance proof is to know a corresponding explicit balance proof, which were proven to be sound in \Cref{theorem:explicit-proof-soundness}.
+\end{proof}
+
+We will now show how to construct ZK balance and transaction validity proofs from a complete data set.
+
+\begin{theorem}\label{theorem:zk-proof-of-balance-in-honest-transaction-map-sequence}
+  Given a complete data set \((T_*,\pi_*(*), P_*(*))\) for generating the ZK balance proofs for an account \(a \in Accounts\) in a simple block sequence \(B_*\), we can generate ZK balance proofs \((P_i)_{i=0}^N,\) where \(P_i\) is a ZK-proof that the balance of \(a\) at index \(i\) in \(B_*\) is at least \(Bal_i(T_*,a)\). We will also be able to ZK complete all transactions sent by \(a\) in \(T_*\).
+\end{theorem}
+
+\begin{proof}
+  The user can construct the ZK balance proofs inductively as follows.
+
+\begin{description}
+    \item[Base case: \(i = 0\)]
+    The user can trivially generate the ZK proof \(P_0\) that \cref{alg:zkp-balance-computation} is satisfied by the public inputs \(h=Hash([0])\), \(account=a\), and \(balance=Bal_0(T_*,a)=0\).
+    \item[Induction step: \(1 \leq i \leq N\) and the user has constructed \(P_{i-1}\)]
+    It is straightforward to verify that the circuit is satisfied by the public and private inputs \(h=H_i(B_*)\), \(account=a\), \(balance=Bal_i(T_*,a)\), \(B = B_i\), \(prev\_h = H_{i-1}(B_*)\), \(prev\_balance = Bal_{i-1}(T_*,a)\), \(T = T_i\), \(P(*) = P_i(*)\), \(\pi(*)=\pi_i(*)\) and \(P_{prev\_balance} = P_{i-1}\).
+  \end{description}
+  We can obtain ZK validity proofs for every transaction sent by \(a\) in \(B_*\) by replacing \(balance\) with 0 in the inputs used for each \(P_i\), since the circuit is clearly still satisfied when setting the balance to zero.
+  \end{proof}
+
+Note that since only the last ZK balance proof and the ZK validity proofs of received transaction are needed to construct a ZK balance proof, users don't have to keep all previous balance proofs. However, when a user receives a ZK validity proof of an incoming transaction, they must regenerate all the ZK balance proofs after the received transaction. This means that users should keep the data set for their account, as well as some periodic ZK-proofs of their own balance to avoid having to recompute all the proofs from the beginning.
+
+\section{Signatures and rollup sequences}\label{section:signatures}
+
+In this section we will add a signature mechanism for ensuring that the senders in a block have actually signed the corresponding transaction map commitment. In doing so, we will define three kinds of rollup blocks, namely \emph{registration blocks}, used for registering a new user on the rollup, \emph{transfer blocks}, used for transacting between rollup users, and \emph{deposit blocks}, used for depositing funds to the rollup from an underlying blockchain.
+
+\begin{defn}[Rollup block and rollup sequence]
+  A rollup block is either a \emph{registration block}, a \emph{deposit block} or a \emph{transfer block}, which are defined below. A \emph{rollup sequence} is a finite sequence of rollup blocks.
+\end{defn}
+
+Given a rollup sequence, we will then derive a simple block sequence from it by taking only the blocks with valid signatures, as explained below. In order to define the rollup blocks, we will first define the set of accounts as \[Accounts = \{source\} \sqcup L2\_accounts \sqcup L1\_accounts,\] where \(L2\_accounts = \mathbb{N}\). Here, \(source\) is the source account, used for depositing into the rollup, \(L2\_accounts\) is the set of L2 addresses used for regular transacting on the rollup, and \(L1\_accounts\) is a set of L1 addresses which are used for withdrawing funds from the rollup to L1.
+
+\subsection{Registration blocks}
+
+Each user must register their public BLS key in a \emph{registration block} before they can transact on the rollup. The user will then be assigned an L2 account, which is an integer which increments for each new account. When registering a new BLS public key, the user must prove that they know the corresponding private key to prevent the rogue key attack, which is done by including a signature of the BLS public key by the corresponding BLS private key in the registration block.
+
+\begin{defn}[Registration block]
+A \emph{registration block} is a tuple \((pk, \sigma)\) where \(pk \in \mathbb{G}_1\) and \(\sigma \in \mathbb{G}_0\). The registration block is \emph{valid} if \(\sigma\) is a valid BLS signature of the message ``I am registering the BLS public key \emph{pk} on Intmax2".
+\end{defn}
+
+In order to be able to quickly add registration blocks to the rollup, we will not require every registration block to be valid, but will instead filter out the invalid blocks when deriving the simple block sequence.
+
+\input{protocols/registration_protocol}
+
+\subsection{Transfer blocks}
+
+Transfer blocks are used for sending transactions on the rollup.
+
+\begin{defn}[Transfer block]
+  A \emph{transfer block} is a tuple \((senders, C, \sigma)\), where \(senders \subset L2\_accounts\) is a finite set of senders, \(C \in \mathcal{C}\) is a transaction tree commitment, and \(\sigma \in \mathbb{G}_0\).
+\end{defn}
+
+For a transfer block \((senders, C, \sigma)\) to be valid, \(\sigma\) must be a valid signature of \(C\) under the BLS public keys of the senders in \(senders\), which are found in the registration blocks preceding the transfer block in the rollup sequence, as explained below. In the same way as for registration blocks, we will not require that \(\sigma\) is a valid BLS signature, and will instead just filter out the invalid transfer blocks when deriving the simple block sequence.
+
+\subsection{Deposit blocks}
+
+Since transfer blocks only allows sending from L2 accounts, we will need a different block type, called \emph{deposit blocks}, for making deposits into the rollup.
+
+\begin{defn}[Deposit block]
+A deposit block is a tuple \((recipient, amount)\), where \(recipient \in L2\_accounts\) and \(amount \in Amounts\).
+\end{defn}
+
+\subsection{Signature verification}
+
+To verify the signatures in the transfer blocks in a rollup sequence, we need to keep track of the BLS public keys assigned to each L2 account.
+
+\begin{defn}[Sequence of registered BLS public keys]
+  Let \(B_* = (B_i)_{i=1}^N\) be a rollup sequence. For each \(0 \leq i \leq N\) we define the sequence \(pk_i(*) = (pk_i(j))_{j=1}^{K(i)}\) of registered BLS public keys in \(B_*\) at index \(i\) by taking the BLS public keys in each of the \(K(i)\) valid registration blocks in the rollup sequence in order, up to and including \(B_i\).
+\end{defn}
+
+\begin{defn}[Valid transfer block]
+  A transfer block \(B_i = (senders, C, \sigma)\) in a rollup sequence \(B_*\) is \emph{valid} if \(\sigma\) is a valid BLS signature of \(C\) by the BLS public keys \((pk_i(s))_{s \in senders}\), where \(pk_i(*)\) are the registered BLS public keys in \(B_*\) at index \(i\).
+\end{defn}
+
+We will derive a simple block sequence from a rollup sequence by taking all deposit blocks and all valid transfer blocks and converting them to simple blocks. In order to be able to convert both deposit blocks and transfer blocks to a simple block, we must extend the commitment scheme to allow committing to a deposit block. In details, we will replace the set \(\mathcal{C}\) of possible commitments and the set \(\Pi\) of inclusion proofs in the original commitment scheme by the disjoint union \(\mathcal{C}' = \mathcal{C} \, \sqcup \, \mathcal{B}_{deposit}\) and the disjoint union \(\Pi' = \Pi \, \sqcup \, \{trivial\}\) respectively, where \(\mathcal{B}_{deposit}\) is the set of deposit blocks and \(\{trivial\}\) is a one-set element consisting of a trivial proof. Then, a valid inclusion proof is either a valid inclusion proof in \(\Pi\) if the commitment is a regular transaction map commitment, or the trivial proof if the commitment is a deposit block.
+
+\begin{defn}[Derived simple block sequence]
+  The \emph{simple block sequence derived from a rollup sequence \(B_*\)} is defined by taking all valid deposit and transfer blocks in \(B_*\) in order, and converting each deposit block \((recipient, amount)\) to the simple block \((\{source\}, (recipient, amount))\) and each transfer block \((senders, C, \sigma)\) to the simple block \((senders, C)\).
+\end{defn}
+
+\subsection{Zero knowledge balance proofs for a rollup sequence}
+
+To prove the balance of an account in a rollup sequence, we will combine a ZK proof that a simple block sequence was correctly derived from the rollup sequence with a ZK balance proof for the account in the simple block sequence.
+
+We will first define the hash of a rollup sequence.
+
+\begin{defn}[Hash of a rollup sequence]
+  Given an encoding of rollup blocks \(enc_{rollup} : \mathcal{B} \rightarrow \{0,1\}^*,\) we define the \emph{hash of a rollup sequence \(B_* = (B_i)_{i=1}^N\) at index \(i\)}, written \(H_i(B_*)\) inductively as follows. We define \(H_0(B_*) = Hash([0]),\) and for \(1 \leq i \leq N\) we define \(H_i(B_*) = Hash(H_{i-1}(B_*) \mathbin\Vert Hash(enc_{rollup}(B_i))).\) For simplicity, we will write \(H(B_*) = H_N(B_*),\) called the \emph{hash of \(B_*\)}.
+\end{defn}
+
+We will use \Cref{alg:zkp-signature-validation} for verifying that a simple block sequence is derived from a rollup sequence, which will be combined with \Cref{alg:zkp-balance-computation} to get \Cref{alg:balance-proof-rollup}, used for proving the balance of an account in a rollup sequence.\footnote{By splitting the balance proofs for a rollup sequence into a balance proof for a simple block sequence and a proof that the simple block sequence was derived correctly from the rollup sequence, we gain performance benefits, since the ZK proof that the simple block sequence was derived correctly only needs to be generated once and distributed to all users.}
+
+\begin{circuit}[H]
+\caption{Verifying that a simple block sequence is derived from a rollup sequence}\label{alg:zkp-signature-validation}
+\begin{algorithmic}[1]
+\Public 
+  \Statex hashes \(h,h' \in \{0,1\}^n\)
+  \Statex a sequence \(pk(*) = (pk(i))_{i=1}^M\) of BLS public keys
+\Private
+  \Statex hashes \(prev\_h, prev\_h' \in \{0,1\}^n\)
+  \Statex a sequence \(prev\_pk(*) = (prev\_pk(i))_{i=1}^{prev\_M}\) of BLS public keys
+  \Statex a rollup block \(B\)
+  \Statex a simple block \(B'\)
+  \Statex a ZK-proof \(P\) that the rollup sequence with hash \(prev\_h\) generates a validated block sequence with hash \(prev\_h'\) and the sequence of BLS public keys \(prev\_pk(*)\)
+  \State Verify \(h = Hash(prev\_h \mathbin\Vert Hash(enc_{rollup}(B)))\)
+  \State Verify \(h' = Hash(prev\_h' \mathbin\Vert Hash(enc_{simple}(B')))\)
+  \State Verify that if \(B\) is a valid registration block \((pk,\sigma)\), then \(pk(*)\) is obtained by adding \(pk\) to \(prev\_pk(*)\).
+  \State Verify the ZK-proof \(P\)
+  \If{\(B\) is a transfer block \((senders, C, \sigma)\) where \(\sigma\) is a valid BLS signature of \(C\) by the BLS public keys \((pk(s))_{s \in senders}\)}
+    \State Verify \(B' = (senders, C)\)
+  \ElsIf{\(B\) is a deposit block \((recipient, amount)\)}
+    \State Verify \(B' = (\{source\}, (recipient, amount))\)
+  \Else
+    \State Verify \(h' = prev\_h'\)
+  \EndIf
+\end{algorithmic}
+\end{circuit}
+
+\begin{circuit}[H]
+\caption{Verify the balance of an account in a rollup sequence}\label{alg:balance-proof-rollup}
+\begin{algorithmic}[1]
+\Public
+  \Statex a hash \(h \in \{0,1\}^n\)
+  \Statex \(account \in Accounts\)
+  \Statex \(balance \in Amounts\)
+\Private
+  \Statex a sequence \(pk_* = (pk_i)_{i=1}^M\) of BLS public keys
+  \Statex a hash \(h' \in \{0,1\}^n\)
+  \Statex a ZK-proof \(P_1\) of \Cref{alg:zkp-signature-validation} proving that the rollup with hash \(h\) generates the BLS public keys \(pk_*\) and the derived simple block sequence with hash \(h'\)
+  \Statex a ZK-proof \(P_2\) of \Cref{alg:zkp-balance-computation} proving that \(account\) owns at least \(balance\) in the simple block sequence with hash \(h'\)
+\State Verify \(P_1\) and \(P_2\)
+\end{algorithmic}
+\end{circuit}
+
+\section{Implementing the design as a rollup}\label{section:rollup-contract}
+
+We turn our design into a ZK-rollup by deploying a rollup contract on an underlying blockchain. The rollup contract fixes a rollup, which we will refer to as \emph{the rollup}, by storing the hashes of the rollup in its storage. It also has functions for adding new blocks to the rollup and for depositing funds from or withdrawing funds to the underlying blockchain. When a new block is added to the rollup, the new hash is computed by the rollup contract and added to its storage. Anyone is allowed to add blocks to the rollup, which gives high censorship resistance. When withdrawing funds from the rollup to an L1 address, the rollup contract will verify a ZK-proof of the balance of the L1 address on the rollup and subtract the amount of funds that has previously been withdrawn to the L1 address (which is also stored in the contract). In details, we have the following rollup contract state.
+
+\begin{defn}[Rollup contract state]
+  The \emph{rollup contract state} is a tuple \((h_*,total\_withdrawn\_amount)\) where \(h_* = (h_i)_{i=0}^N\) are the hashes of the rollup at each index, and \(total\_withdrawn\_amount : L1\_address \rightarrow Amounts\) is a map which stores the total amount that has previously been withdrawn to each L1 address.\footnote{We note that in order to save space, instead of storing all previous hashes of the rollup in the contract storage, we can store only the \(n\) newest hashes, where \(n\) may be increased by anyone willing to pay the storage costs. Also, if more than one rollup block is added in an L1 block, we only need to store the last hash. With these features, each hash is guaranteed to be stored in the contract storage for the duration of at least \(t \cdot n\), where \(t\) is the minimum time between each L1 block, and \(n\) is the number of hashes in the storage.}
+\end{defn}
+
+\subsection{Adding blocks to the rollup}
+
+Anyone can add blocks to the rollup by calling \Cref{alg:adding-blocks}. This function can also be used to deposit funds, as explained in Protocol ~\ref{alg:deposit}.
+
+\begin{contractfunction}[H]
+\caption{Adding a new block to the rollup.}\label{alg:adding-blocks}
+\begin{algorithmic}[1]
+\Require 
+\Statex A rollup block \(B\)
+\Statex The amount \(included\_amount \in Amounts\) included with the L1 transaction
+\Statex The current sequence \(h_* = (h_i)_{i=1}^N\) of hashes stored in the rollup contract
+\Ensure \(h_*\) is the new sequence of hashes stored in the rollup contract.
+\If{\(B = (recipient, amount)\) is a deposit block and \(amount = included\_amount\) or if \(B\) is a non-deposit block}
+  \State \(h_* \gets (h_0, h_1, \dots, h_N, Hash(h_N \mathbin\Vert enc_{rollup}(B)))\)
+\EndIf
+\end{algorithmic}
+\end{contractfunction}
+
+\input{protocols/deposit_protocol}
+
+\subsection{Withdrawing from the rollup}
+
+A user can withdraw from the rollup to an L1 address by calling \Cref{alg:withdrawing}.\footnote{We mention that this can be made more efficient by batching many ZK balance proofs together into one proof used to withdraw to many L1 addresses.} We refer the reader to Protocol~\ref{box:withdrawal}, where we describe an overview of the withdrawal protocol.
+
+\begin{contractfunction}[H]
+\caption{Withdrawing from the rollup.}\label{alg:withdrawing}
+\begin{algorithmic}[1]
+\Require 
+\Statex A hash \(h \in \{0,1\}^n\).
+\Statex An index \(0 \leq i \leq N\)
+\Statex An address \(a \in L1\_addresses\) which we will withdraw to.
+\Statex An amount \(balance \in Amounts\).
+\Statex A ZK-proof \(P\) of \Cref{alg:balance-proof-rollup} proving that \(a\) has a balance of at least \(balance\) in the rollup sequence with hash \(h\).
+\Statex The current state of \(total\_amount\_withdrawn\) in the rollup contract storage.
+\Ensure
+\Statex \(total\_amount\_withdrawn\) is the new state of the total amount withdrawn.
+\Statex \(withdrawn\_amount \in Amounts\) is the amount to be withdrawn.
+\If{\(h = h_i\) and if \(P\) is a valid ZK-proof}
+\State{\(withdrawn\_amount \gets balance - total\_amount\_withdrawn[a]\)}
+\Else
+  \State \(withdrawn\_amount = 0\)
+\EndIf
+\State{\(total\_amount\_withdrawn[a] \gets total\_amount\_withdrawn[a] + withdrawn\_amount\)}
+\end{algorithmic}
+\end{contractfunction}
+
+\input{protocols/withdrawal_protocol}
