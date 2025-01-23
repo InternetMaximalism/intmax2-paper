@@ -1,4 +1,4 @@
-As the blockchain ecosystem continually evolves, so does the urgency for blockchain scaling solutions that preserve security, reduce transaction costs, and improve overall throughput. Layer 2 technologies, particularly rollups, have emerged as pivotal tools to overcome these challenges, and have thus gathered substantial attention. Among these, Zero-Knowledge rollups (or ZK-rollups) have shown great promise due to their unique capability to bundle numerous transactions into a single proof that can be verified quickly and cheaply onchain. Existing ZK-rollups, while managing to move computation costs away from the underlying Layer 1 (L1) blockchain, are still limited by the fact that all necessary data for verifying users' balances have to be posted on L1. This data, in a typical scenario, includes the transaction sender, the index of the token, the amount, and the recipient for each transaction, thus limiting the number of transactions per second that can be supported by the rollup.
+As the blockchain ecosystem continually evolves, so does the urgency for blockchain scaling solutions that preserve security, reduce transaction costs, and improve overall throughput. Layer 2 (L2) technologies, particularly rollups, have emerged as pivotal tools to overcome these challenges, and have thus gathered substantial attention. Among these, Zero-Knowledge rollups (or ZK-rollups) have shown great promise due to their unique capability to bundle numerous transactions into a single proof that can be verified quickly and cheaply onchain. Existing ZK-rollups, while managing to move computation costs away from the underlying Layer 1 (L1) blockchain, are still limited by the fact that all necessary data for verifying users' balances have to be posted on L1. This data, in a typical scenario, includes the transaction sender, the index of the token, the amount, and the recipient for each transaction, thus limiting the number of transactions per second that can be supported by the rollup.
 
 \subsection{Data Availability}
 
@@ -11,12 +11,10 @@ Intmax2 is an efficient and stateless rollup design that:
 \begin{itemize}
   \setlength\itemsep{0.35em}
 
-    \item Only posts the index\footnote{This can be as low as 4-6 bytes without compression, depending on the number of users in the system.} of each transaction sender, as well as a merkle tree root and an aggregated signature of it for each batch on L1.
+    \item Uses less onchain data than any existing rollup, giving an upper limit of 7500 transaction batches per second on Ethereum, where each transaction batch can transfer an unlimited number of tokens to an unlimited number of recipients.
 
-    \item Allows senders to transfer an unlimited number of tokens to an unlimited number of recipients while using a fixed 4-6 bytes data consumption.
-
-    %MY: maybe change phrasing
-    \item Shifts the computational requirements from the aggregator to the client, making it highly scalable with the number of users.
+    % %MY: maybe change phrasing
+    % \item Shifts the computational requirements from the aggregator to the client, making it highly scalable with the number of users.
 
     \item Offers permissionless block production.
 
@@ -24,19 +22,6 @@ Intmax2 is an efficient and stateless rollup design that:
   
 \end{itemize}
 
-\subsection{Our Design}
+\subsection{Formal verification of the security proof}
 
-We divide the description of our design into four parts.
-
-\smallbreak
-First, in \Cref{section:transaction-map-sequences} we define a simple blockchain where all transaction data is public, and where everyone can verify the balance of every account.
-\smallbreak
-Second, in \Cref{section:balance-proofs} we show how users can prove their balances in a smaller blockchain whose blocks consists of commitments to a set of transactions (e.g. merkle roots) together with the set of senders who have signed the commitment in the block. For simplicity, we first show how users can construct explicit balance proofs of their balances, and then replace the explicit proofs with recursive ZK-proofs~\cite{supernova,nova,plonky2}, which results in a much more efficient approach.
-\smallbreak
-Third, in \Cref{section:signatures} we describe how we leverage BLS signatures to verify that each sender has signed the commitment in each block. This involves defining three block types (i.e., transfer, deposit, and registration). We will also define the set of rollup accounts which includes special accounts used for withdrawing funds to the underlying blockchain.
-\smallbreak
-Finally, in \Cref{section:rollup-contract} we turn our design into a rollup by deploying a rollup contract on an underlying blockchain. We describe the rollup contract and its functions, i.e. how to add blocks, how to deposit funds, and how to perform withdrawals. We highlight that this process is completely open and, therefore, decentralized. As a result, any system entity is able to perform these actions.
-
-\smallbreak
-
-We believe that this represents a proper breakdown of the protocol and allows for a clean and incremental description of our design.
+We give a pen-and-paper proof of the security of the protocol in \Cref{thm:rollup-contract-is-secure}. This proof has been formally verified in the Lean theorem prover\cite{demoura2021the} by the Nethermind Formal Verification team \cite{nethermind}. All mathematical definitions and statements that are needed for the security proof contain a hyperlink (like this: \href{https://github.com/\repo FVIntmax/}{\ExternalLink}) to the formalized version.
