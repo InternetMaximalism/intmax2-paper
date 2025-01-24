@@ -33,6 +33,7 @@
         buildInputs = with pkgs; [ 
           tex
           just
+          lazygit
         ]; 
       };
       packages = {
