@@ -22,6 +22,7 @@
         hyperref
         enumitem
         mdframed
+        tikz-cd
         zref 
         needspace
         multirow;
