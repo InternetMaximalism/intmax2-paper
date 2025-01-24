@@ -17,7 +17,6 @@
 \usepackage{mdframed}
 \usepackage{tikz}
 \usepackage{tikz-cd}
-\usepackage{placeins}
 \usepackage{enumitem}
 
 \graphicspath{{figures/}}
@@ -136,9 +135,6 @@
   \excludecomment{wrap} % anything wrapped in a {wrap} environment will be excluded
 \fi
 
-\usepackage{nomencl}
-\makenomenclature
-
 % Used for displaying a sample figure. If possible, figure files should
 % be included in EPS format.
 %
@@ -219,24 +215,7 @@ We present a blockchain scaling solution called Intmax2, which is a Zero-Knowled
 \clearpage
 % ---- Bibliography ----
 \bibliographystyle{splncs04}
-\bibliography{references}
-
-\nomenclature{\([n]\)}{The set of integers \(\{0, 1, \dots, n\}\)}
-\nomenclature{\(Y^X\)}{The set of functions from the set \(X\) to the set \(Y\)}
-\nomenclature{\(X^*\)}{The set of finite lists of elements of the set \(X\)}
-\nomenclature{\(x_* = (x_i)_{i \in [n]}\)}{A finite list of \(n\) elements of the set \(X\)}
-\nomenclature{\(\wedge\)}{The \emph{and} operator of boolean values and more generally the meet in a poset.}
-\nomenclature{\(\vee\)}{The \emph{or} operator of boolean values and more generally the join in a poset.}
-\nomenclature{\(\V\)}{A partially ordered group}
-\nomenclature{\(\V_+\)}{The subset of positive values of \(\V\)}
-\nomenclature{\(\S\)}{A set of states in a semiautomation}
-\nomenclature{\(\T\)}{A set of transactions in a semiautomation}
-\nomenclature{\(\C\)}{A set of commitments}
-\nomenclature{\(\Pi\)}{A set of inclusion proofs}
-\nomenclature{\(\Sigma\)}{A set of signatures}
-\nomenclature{\(\M\)}{The set \(\M = \{0,1\}\) of binary strings (messages).}
-
-% \printnomenclature
+\bibliography{main}
 
 \newpage
 \appendix
