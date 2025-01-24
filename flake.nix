@@ -15,6 +15,7 @@
         footmisc
         latexmk
         biblatex
+        llncs
         biber
         comment
         glossaries
