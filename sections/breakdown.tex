@@ -48,20 +48,20 @@ Suppose we have a set of senders \(S \subseteq \K_2\) where each sender \(s \in 
 To send the transaction batches, the senders will first select a single aggregator\footnote{The protocol allows anyone to be an aggregator for a transfer block, enabling maximum censorship resistance.} and agree upon a common bitstring \(extradata \in \{0,1\}^*\). This bitstring can be used to implement protections against replay attacks and delayed block publication (see \Cref{section:protection}). Then the senders and aggregator interacts in the following protocol.
 
 \begin{enumerate}
-  \item First, each sender \(s\) chooses a random salt \(salt_s\), hashes their transaction batch with the salt \[h_s \leftarrow H(t_s,salt_s),\] and sends \(h_s\) to the aggregator.\footnote{Sending the transaction hash instead of the transaction itself gives privacy from the aggregator.}
-  \item The aggregator collects all the transaction batch hashes from the senders. Let \(S' \subseteq S\) be the subset of senders who sent a transaction batch hash to the aggregator. The aggregator then constructs the dictionary\footnote{See \Cref{section:dictionaries} for the definition of a dictionary.} \((S',h)\) where \(h_s\) is the transaction batch hash by \(s\) for all \(s \in S'\), and constructs a dictionary commitment and lookup proofs: \[(C, (S',\pi)) \leftarrow \mathsf{AD.Commit}(S',h).\] The aggregator sends to each sender \(s \in S'\) the dictionary commitment \(C\) and the lookup proof \(\pi_s\) for the sender's transaction batch hash.
-  \item Upon receiving the dictionary commitment and lookup proof, each sender \(s\) checks if the lookup proof is valid with the commitment: \[\mathsf{AD.Verify}(\pi_s,s,h_s,C) \stackrel{?}{=} True.\] If the lookup proof is valid, the sender generates the signature \[\sigma_s \leftarrow \mathsf{SA.Sign}(sk_s,(C,aggregator,extradata))\] and sends this signature to the aggregator.
-  \item The aggregator collects the signatures from the senders and verifies them. Let \(S'' \subseteq S'\) be the subset of senders who sent a valid signature. The aggregator then constructs the aggregated signature \[\sigma \leftarrow \mathsf{SA.Aggregate}((s,\sigma_s)_{s \in S''}),\] and constructs the tuple \((aggregator,extradata,C,S'',\sigma)\), called a \emph{transfer block}. Formally, we define the set of transfer blocks \href{https://github.com/\repo FVIntmax/Block.lean#L25}{\ExternalLink}as \[\B_{transfer} = \K_1 \times \{0,1\}^* \times \mathsf{AD}.\C \times \mathcal{P}(\K_2) \times \mathsf{SA}.\Sigma.\]
-  The aggregator sends this transfer block to the rollup contract using their L1 account.
-  \item Upon receiving the transfer block, the rollup contract verifies the aggregated signature: \[\mathsf{SA.Verify}(S'',(C,aggregator,extradata),\sigma) \stackrel{?}{=} True\] and also verifies that the transaction is indeed coming from the account \(aggregator\). If these checks are valid, the contract adds the transfer block to the list of blocks in its storage. If not, the transaction is reverted.
+	\item First, each sender \(s\) chooses a random salt \(salt_s\), hashes their transaction batch with the salt \[h_s \leftarrow H(t_s,salt_s),\] and sends \(h_s\) to the aggregator.\footnote{Sending the transaction hash instead of the transaction itself gives privacy from the aggregator.}
+	\item The aggregator collects all the transaction batch hashes from the senders. Let \(S' \subseteq S\) be the subset of senders who sent a transaction batch hash to the aggregator. The aggregator then constructs the dictionary\footnote{See \Cref{section:dictionaries} for the definition of a dictionary.} \((S',h)\) where \(h_s\) is the transaction batch hash by \(s\) for all \(s \in S'\), and constructs a dictionary commitment and lookup proofs: \[(C, (S',\pi)) \leftarrow \mathsf{AD.Commit}(S',h).\] The aggregator sends to each sender \(s \in S'\) the dictionary commitment \(C\) and the lookup proof \(\pi_s\) for the sender's transaction batch hash.
+	\item Upon receiving the dictionary commitment and lookup proof, each sender \(s\) checks if the lookup proof is valid with the commitment: \[\mathsf{AD.Verify}(\pi_s,s,h_s,C) \stackrel{?}{=} True.\] If the lookup proof is valid, the sender generates the signature \[\sigma_s \leftarrow \mathsf{SA.Sign}(sk_s,(C,aggregator,extradata))\] and sends this signature to the aggregator.
+	\item The aggregator collects the signatures from the senders and verifies them. Let \(S'' \subseteq S'\) be the subset of senders who sent a valid signature. The aggregator then constructs the aggregated signature \[\sigma \leftarrow \mathsf{SA.Aggregate}((s,\sigma_s)_{s \in S''}),\] and constructs the tuple \((aggregator,extradata,C,S'',\sigma)\), called a \emph{transfer block}. Formally, we define the set of transfer blocks \href{https://github.com/\repo FVIntmax/Block.lean#L25}{\ExternalLink}as \[\B_{transfer} = \K_1 \times \{0,1\}^* \times \mathsf{AD}.\C \times \mathcal{P}(\K_2) \times \mathsf{SA}.\Sigma.\]
+	      The aggregator sends this transfer block to the rollup contract using their L1 account.
+	\item Upon receiving the transfer block, the rollup contract verifies the aggregated signature: \[\mathsf{SA.Verify}(S'',(C,aggregator,extradata),\sigma) \stackrel{?}{=} True\] and also verifies that the transaction is indeed coming from the account \(aggregator\). If these checks are valid, the contract adds the transfer block to the list of blocks in its storage. If not, the transaction is reverted.
 \end{enumerate}
 
-  \begin{figure}
+\begin{figure}
 
-\centering
-\includegraphics[width=\textwidth]{user-protocol.pdf}
-    \caption{The transfer protocol. In this example, Alice wants to send 5 coins to Bob. a) Alice starts by sending the hash of the the transaction batch, consisting of a single transaction of 5 coins to Bob, and a random salt to an aggregator. b) The aggregator then constructs a merkle tree consisting of Alice's transaction batch hash and the transaction batch hashes of other senders. c) The aggregator sends the merkle proof of Alice's transaction batch to Alice. d) Alice verifies the merkle proof and signs the merkle root together with the pre-determined extradata \(e\). This signature is sent back to the aggregator. e) The aggregator collects the signatures from all senders, constructs the transfer block, and sends it to the rollup contract. f) Alice watches the blocks that are added to the rollup contract until the block containing her transaction is published. g) Alice updates her balance proof by adding her transaction batch, the salt and the merkle proof. h) Alice sends to Bob her updated balance proof. h) Bob updates his view of the rollup blocks. i) Bob updates his balance proof by merging it with the balance proof he received from Alice.}
-\label{fig:user-protocol}
+	\centering
+	\includegraphics[width=\textwidth]{user-protocol.pdf}
+	\caption{The transfer protocol. In this example, Alice wants to send 5 coins to Bob. a) Alice starts by sending the hash of the the transaction batch, consisting of a single transaction of 5 coins to Bob, and a random salt to an aggregator. b) The aggregator then constructs a merkle tree consisting of Alice's transaction batch hash and the transaction batch hashes of other senders. c) The aggregator sends the merkle proof of Alice's transaction batch to Alice. d) Alice verifies the merkle proof and signs the merkle root together with the pre-determined extradata \(e\). This signature is sent back to the aggregator. e) The aggregator collects the signatures from all senders, constructs the transfer block, and sends it to the rollup contract. f) Alice watches the blocks that are added to the rollup contract until the block containing her transaction is published. g) Alice updates her balance proof by adding her transaction batch, the salt and the merkle proof. h) Alice sends to Bob her updated balance proof. h) Bob updates his view of the rollup blocks. i) Bob updates his balance proof by merging it with the balance proof he received from Alice.}
+	\label{fig:user-protocol}
 \end{figure}
 
 \subsubsection{Phase 2: Maintaining and distributing balance proofs}
@@ -69,19 +69,19 @@ To send the transaction batches, the senders will first select a single aggregat
 To be able to prove the balance of their account, each user needs to maintain a \emph{balance proof}, which is the collection of transaction batches with corresponding salts and lookup proofs that they have received from an aggregator (when sending transactions) and from other users (when receiving transactions). We formally define \href{https://github.com/\repo FVIntmax/BalanceProof.lean#L27}{\ExternalLink} the set of balance proofs as \[\Pi := Dict(\mathsf{AD}.\C \times \K_2, (\mathsf{AD}.\Pi \times \{0,1\}^*) \times \V_+^{\K}).\]
 
 A balance proof is valid if the following algorithm returns \(True\) \href{https://github.com/\repo FVIntmax/BalanceProof.lean#L60}{\ExternalLink}.
-    \[
-  \begin{aligned}[t]
-    \mathsf{Verify} \colon \Pi &\to \{True,False\} \\
-                  (K,D) &\mapsto \bigwedge_{\substack{(C,s) \in K \\ ((\pi,salt), t) = D(C,s)}} \mathsf{AD.Verify}(\pi,s,\mathsf{H}(t,salt),C)
-  \end{aligned}\]
+\[
+	\begin{aligned}[t]
+		\mathsf{Verify} \colon \Pi & \to \{True,False\}                       \\
+		(K,D)                      & \mapsto \bigwedge_{\substack{(C,s) \in K \\ ((\pi,salt), t) = D(C,s)}} \mathsf{AD.Verify}(\pi,s,\mathsf{H}(t,salt),C)
+	\end{aligned}\]
 
 In other words, a valid balance proof is a dictionary which maps commitment-sender pairs \((C,s)\) to tuples \(((\pi,salt), t)\) where \(t \in \V_+^{\K}\) is a transaction batch, \(salt\) is a random salt and \(\pi \in \mathsf{AD}.\Pi\) is a valid lookup proof that \(H(t,salt)\) is the value at index \(s\) in an authenticated dictionary with commitment \(C\).
 
 Each user will maintain a balance proof, which is initialized as the empty dictionary. In the second phase of the transfer protocol, each transaction sender will add their transaction batch with the corresponding lookup proof they received from the aggregator (if they did receive one) to their own balance proof. Then, they will send this new balance proof to each recipient of the transaction batch. Upon receiving the balance proof, each recipient will then merge it with their own. In details, if \(\pi_b \in \Pi\) is the current balance proof of a recipient named Bob and \(\pi_a \in \Pi\) is the balance proof they received from a sender named Alice, then Bob performs the following algorithm:
 
 \begin{itemize}
-  \item Verify the received balance proof: \[\mathsf{Verify}(\pi_a) \stackrel{?}{=} True.\] If valid, continue to the next step, otherwise terminate.
-  \item Update their balance proof \(\pi_b\) by merging it with \(\pi_a\): \[\pi_b \leftarrow \mathsf{Merge}(\pi_a, \pi_b),\] where \(\mathsf{Merge}\) is the dictionary merging algorithm defined in \Cref{section:dictionaries}.
+	\item Verify the received balance proof: \[\mathsf{Verify}(\pi_a) \stackrel{?}{=} True.\] If valid, continue to the next step, otherwise terminate.
+	\item Update their balance proof \(\pi_b\) by merging it with \(\pi_a\): \[\pi_b \leftarrow \mathsf{Merge}(\pi_a, \pi_b),\] where \(\mathsf{Merge}\) is the dictionary merging algorithm defined in \Cref{section:dictionaries}.
 \end{itemize}
 
 To compute the balance of their accounts, users will use the balance function \[\mathsf{Bal} \colon \Pi \times \B^* \to \S,\] defined in \Cref{section:balances}. Here \(\S\) is the set of states, where a state is an assignment of a balance to each account. Formally, let \(\overline{\K} := \K_1 \amalg \K_2 \amalg \{\source\}\), where Source is a special account used to represent deposits and withdrawals. Then the set of states \(\S\) is defined \href{https://github.com/\repo FVIntmax/State.lean#L31}{\ExternalLink}as \[\S := \{b \in \V^{\overline{\K}}, \text{ such that } b_k \geq 0,\, \forall k \in \overline{K}\backslash \{\source\}\}.\] The balance function takes a balance proof \(\pi \in \Pi\) and the current state of the rollup contract \((B_*) \in \B^*\), and returns the balance of each account in the rollup that can be proven by the balance proof.
@@ -91,11 +91,11 @@ To compute the balance of their accounts, users will use the balance function \[
 When a user wants to withdraw funds from their L2 account to an L1 account, they must first transfer the funds to the L1 account using the transfer protocol described above. When the transfer block is added to the rollup contract, the contract does not automatically withdraw the funds to L1. Instead, to initiate the withdrawal, the owner of the L1 account must send a withdrawal request to the rollup contract which consists of the user's current balance proof \(\pi \in \Pi\). Upon receiving the balance proof, the rollup contract performs the following steps:
 
 \begin{itemize}
-    \item First, the balance proof is verified: \[\mathsf{Verify}(\pi) \stackrel{?}{=} True.\]
-    \item If the balance proof is valid, the rollup contract constructs a withdrawal block, which is simply the in-rollup balance of each L1 account computed from the balance proof and the current rollup state:
-    \[B \leftarrow \mathsf{Bal}(\pi,B_*)\vline_{K_1},\] where \(B_*\) is the current list of blocks in the rollup contract. Formally, the set of withdrawal blocks is defined \href{https://github.com/\repo FVIntmax/Block.lean#L31}{\ExternalLink}as \[\B_{withdrawal} = \V_+^{K_1}.\]
-    \item The contract adds the withdrawal block \(B\) to the list of blocks in its storage: \[B_* \leftarrow (B_* || (B))\]
-    \item For each L1 account \(k \in K_1\), the contract withdraws the amount \(B_k\) to the L1 account.
+	\item First, the balance proof is verified: \[\mathsf{Verify}(\pi) \stackrel{?}{=} True.\]
+	\item If the balance proof is valid, the rollup contract constructs a withdrawal block, which is simply the in-rollup balance of each L1 account computed from the balance proof and the current rollup state:
+	      \[B \leftarrow \mathsf{Bal}(\pi,B_*)\vline_{K_1},\] where \(B_*\) is the current list of blocks in the rollup contract. Formally, the set of withdrawal blocks is defined \href{https://github.com/\repo FVIntmax/Block.lean#L31}{\ExternalLink}as \[\B_{withdrawal} = \V_+^{K_1}.\]
+	\item The contract adds the withdrawal block \(B\) to the list of blocks in its storage: \[B_* \leftarrow (B_* || (B))\]
+	\item For each L1 account \(k \in K_1\), the contract withdraws the amount \(B_k\) to the L1 account.
 \end{itemize}
 
 These steps ensure that a user cannot double-spend by withdrawing the same funds twice, since the amount to be withdrawn is computed by applying the balance function to the balance proof \emph{and all previous blocks that have been added to the rollup}, which includes all previous withdrawal blocks. This is formalised in \Cref{thm:rollup-contract-is-secure}, which is stated and proven in \Cref{section:security}.
@@ -111,11 +111,11 @@ In order to make users trust them, an aggregator can self-impose restrictions th
 In this section we analyze the scalability of our design and describe how to add compression to achieve even more scalability. The main bottleneck for the scalability is the size of the transfer blocks, which is decomposed as follows:
 
 \begin{itemize}
-  \item The aggregator's L1 address (20 bytes in Ethereum)
-  \item A \emph{extradata} string (32 bytes)
-  \item An authenticated dictionary commitment (32 bytes if it is a merkle tree root)
-  \item The subset of senders \(S \subseteq \K_2\) in the block (\(|S| \times 96\) bytes if encoded as a list of BLS public keys)
-  \item An aggregated signature (48 bytes for BLS signatures)
+	\item The aggregator's L1 address (20 bytes in Ethereum)
+	\item A \emph{extradata} string (32 bytes)
+	\item An authenticated dictionary commitment (32 bytes if it is a merkle tree root)
+	\item The subset of senders \(S \subseteq \K_2\) in the block (\(|S| \times 96\) bytes if encoded as a list of BLS public keys)
+	\item An aggregated signature (48 bytes for BLS signatures)
 \end{itemize}
 
 This gives a transfer block size of \(|S| \times 96 + 132\) bytes, where \(|S|\) is the number of senders in the block. This is smaller than for traditional rollups where all transaction details (such as sender, recipient and transaction amount) are included in the blocks. Also, unlike traditional rollups, our block size only depends on the number of senders, and not the number of transactions. This means that a sender can send a transaction batch with an arbitrary number of recipients without affecting the size of the transfer block.
@@ -135,11 +135,11 @@ First, the rollup contract is modified so that instead of storing the list of al
 Phase 1 of the transfer protocol regarding how to construct and add transfer blocks remains exactly as described in \Cref{section:transferring-phase-1}, but Phase 2 regarding how to maintain and distribute balance proofs is changed as follows. When a transaction sender \(s\) sends funds to a recipient \(r\), instead of providing the recipient with the complete transaction history of the sender and recursively those of other users (as in the simplified design), they will only send the tuple \((root, s, r, v, \pi)\) where
 
 \begin{itemize}
-  \item \(root \in \{0,1\}^n\) is the history root of the rollup block containing the transaction,
-  \item \(s \in \K_2\) is the sender's L2 address,
-  \item \(r \in \K\) is the recipient's address,
-  \item \(v \in \V_+\) is the transaction amount,
-  \item \(\pi\) is a transaction validity proof, which is a ZK-proof proving that the sender \(s\) did send a transaction with value \(v\) to the recipient \(r\) in the rollup block with history hash \(root\), and that the sender had a sufficient balance for sending it.
+	\item \(root \in \{0,1\}^n\) is the history root of the rollup block containing the transaction,
+	\item \(s \in \K_2\) is the sender's L2 address,
+	\item \(r \in \K\) is the recipient's address,
+	\item \(v \in \V_+\) is the transaction amount,
+	\item \(\pi\) is a transaction validity proof, which is a ZK-proof proving that the sender \(s\) did send a transaction with value \(v\) to the recipient \(r\) in the rollup block with history hash \(root\), and that the sender had a sufficient balance for sending it.
 \end{itemize}
 
 This means that the recipient only learns about this transaction, and gets zero knowledge about anything else, such as the balance of the sender or other transactions.
@@ -147,8 +147,8 @@ This means that the recipient only learns about this transaction, and gets zero 
 To be able to construct transaction validity proofs, each user needs to maintain the data consisting of
 
 \begin{itemize}
-  \item All transaction batches they have sent (that have been included in a transfer block onchain) together with their corresponding salts and lookup proofs
-  \item All verified transactions \((hash, s,r, v, \pi)\) they have received from other users
+	\item All transaction batches they have sent (that have been included in a transfer block onchain) together with their corresponding salts and lookup proofs
+	\item All verified transactions \((hash, s,r, v, \pi)\) they have received from other users
 \end{itemize}
 
 Given this data, as well as the list of blocks added to the rollup\footnote{This can be obtained by monitoring all L1 transactions sent to the rollup contract.}, each user can generate validity proofs for their transactions.
