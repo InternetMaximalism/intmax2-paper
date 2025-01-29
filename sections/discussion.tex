@@ -3,37 +3,122 @@
 \subsection{Tracing the Path to Intmax2}
 % Plasma Prime -> Spring Rollup -> Leona -> Intmax v1 -> Intmax v2
 
-Plasma Prime~\cite{plasma_prime} is the starting point for the path that lead to Intmax2. Plasma Prime incorporates RSA accumulators and is based on the UTXO model, where each unspent output represents ownership of a specific segment. The concept of range chunking is also introduced, and is used to compress transaction history to simplify block verification. This design also features the use of a SumMerkleTree for efficient overlap verification between transaction segments and inclusion proof generation.
+Plasma Prime~\cite{plasma_prime} is the starting point for the path
+that lead to Intmax2. Plasma Prime incorporates RSA accumulators and
+is based on the UTXO model, where each unspent output represents
+ownership of a specific segment. The concept of range chunking is
+also introduced, and is used to compress transaction history to
+simplify block verification. This design also features the use of a
+SumMerkleTree for efficient overlap verification between transaction
+segments and inclusion proof generation.
 \smallbreak
-Springrollup~\cite{springrollup} is a Layer 2 solution that introduces a new type of zk-rollup, that aims to use less on-chain data and enhance privacy. The rollup state is divided into on-chain and off-chain available states, with the design ensuring users' funds remain safe even if the off-chain state is withheld by the operator. The operator can modify the rollup state by posting a rollup block to the L1 contract, which includes the new merkle state root, a diff between the old and new on-chain states, and a zk-proof of valid operations. The system also includes a frozen mode for situations where the operator doesn't post a new rollup block within 3 days.
+Springrollup~\cite{springrollup} is a Layer 2 solution that
+introduces a new type of zk-rollup, that aims to use less on-chain
+data and enhance privacy. The rollup state is divided into on-chain
+and off-chain available states, with the design ensuring users' funds
+remain safe even if the off-chain state is withheld by the operator.
+The operator can modify the rollup state by posting a rollup block to
+the L1 contract, which includes the new merkle state root, a diff
+between the old and new on-chain states, and a zk-proof of valid
+operations. The system also includes a frozen mode for situations
+where the operator doesn't post a new rollup block within 3 days.
 \smallbreak
-Intmax~\cite{intmax} introduces a design where the aggregator maintains a global state that is used when the aggregator makes new rollup blocks. This state is not necessarily known by anyone other than the aggregator, and can be withheld by the aggregator. This means that to allow multiple aggregators for the rollup, each aggregator must be trusted to provide the updated rollup state off-chain to the next aggregator in order to keep the rollup alive. This results in two things: First, since each aggregator needs to build upon the previous block, this method requires the complexity of a leader selection method to determine which aggregator can create the next block. Second, and more importantly, the rollup will halt if one of the aggregators fails to provide the data to the next aggregator, and all users would need to exit the rollup. This means that all aggregators need to be trusted in order to guarantee liveliness.
+Intmax~\cite{intmax} introduces a design where the aggregator
+maintains a global state that is used when the aggregator makes new
+rollup blocks. This state is not necessarily known by anyone other
+than the aggregator, and can be withheld by the aggregator. This
+means that to allow multiple aggregators for the rollup, each
+aggregator must be trusted to provide the updated rollup state
+off-chain to the next aggregator in order to keep the rollup alive.
+This results in two things: First, since each aggregator needs to
+build upon the previous block, this method requires the complexity of
+a leader selection method to determine which aggregator can create
+the next block. Second, and more importantly, the rollup will halt if
+one of the aggregators fails to provide the data to the next
+aggregator, and all users would need to exit the rollup. This means
+that all aggregators need to be trusted in order to guarantee liveliness.
 \smallbreak
-Intmax2 (this work), solves these problems by modifying the protocol so that block production becomes stateless,
-meaning that new blocks can be added to the rollup without having to know the previous blocks at all, allowing aggregating to become decentralized.
+Intmax2 (this work), solves these problems by modifying the protocol
+so that block production becomes stateless,
+meaning that new blocks can be added to the rollup without having to
+know the previous blocks at all, allowing aggregating to become decentralized.
 
 \subsection{Liveness}
-We highlight that if a user receives a transaction and then remains offline for an extended period of time, the user is still able to perform withdrawals at a future point in time when they are online again. While it is recommended that a user continuously performs the update of the recursive zero-knowledge balance proof that allows for the withdrawal of funds, the user can remain offline for a certain time period and then, when back online, can perform a synchronization process and calculate the corresponding recursive zero knowledge proof (e.g., ~\cite{nova_fixed}).
+We highlight that if a user receives a transaction and then remains
+offline for an extended period of time, the user is still able to
+perform withdrawals at a future point in time when they are online
+again. While it is recommended that a user continuously performs the
+update of the recursive zero-knowledge balance proof that allows for
+the withdrawal of funds, the user can remain offline for a certain
+time period and then, when back online, can perform a synchronization
+process and calculate the corresponding recursive zero knowledge
+proof (e.g., ~\cite{nova_fixed}).
 
 %\subsection{Flexibility of Intmax2 Protocol}
-%In this paper, we present an anticipated mode of operation that allows users to engage in transactions within the ZK-rollup by utilizing an external aggregator. However, Intmax2 offers users the flexibility to bypass the aggregator and assume the role themselves, enabling them to directly submit transfer batches to the underlying layer 1. This approach not only provides a high degree of protocol flexibility but also enhances security and censorship resistance for end users.
-
+%In this paper, we present an anticipated mode of operation that
+% allows users to engage in transactions within the ZK-rollup by
+% utilizing an external aggregator. However, Intmax2 offers users the
+% flexibility to bypass the aggregator and assume the role
+% themselves, enabling them to directly submit transfer batches to
+% the underlying layer 1. This approach not only provides a high
+% degree of protocol flexibility but also enhances security and
+% censorship resistance for end users.
 
 \subsection{Privacy of Intmax2}
-Our proposed solution does not post any transaction data on the underlying layer 1. Also, since aggregators do not need to verify transactions, the transaction data can also be hidden from the aggregators. As a result, the details of user transactions are only revealed to the recipients. As the importance of privacy on blockchains continues to grow, our proposed solution offers a promising path towards a privacy-focused future.
+Our proposed solution does not post any transaction data on the
+underlying layer 1. Also, since aggregators do not need to verify
+transactions, the transaction data can also be hidden from the
+aggregators. As a result, the details of user transactions are only
+revealed to the recipients. As the importance of privacy on
+blockchains continues to grow, our proposed solution offers a
+promising path towards a privacy-focused future.
 
 \subsection{Delegating Zero-Knowledge Proof Generation}
 
-The emergence of new research on delegating the generation of zero-knowledge proofs~\cite{zksaas}, brings exciting prospects for the wider adoption of these technologies, particularly among light clients like mobile phones. This development holds great promise in overcoming the computational limitations of resource-constrained devices and enabling them to actively engage in zero-knowledge proof protocols. By delegating the generation of zero-knowledge proofs to more powerful devices or servers, the burden of computationally intensive tasks can be alleviated, paving the way for enhanced participation and utilization of zero-knowledge proofs.
+The emergence of new research on delegating the generation of
+zero-knowledge proofs~\cite{zksaas}, brings exciting prospects for
+the wider adoption of these technologies, particularly among light
+clients like mobile phones. This development holds great promise in
+overcoming the computational limitations of resource-constrained
+devices and enabling them to actively engage in zero-knowledge proof
+protocols. By delegating the generation of zero-knowledge proofs to
+more powerful devices or servers, the burden of computationally
+intensive tasks can be alleviated, paving the way for enhanced
+participation and utilization of zero-knowledge proofs.
 
-As the research continues to evolve and mature, we anticipate a future where zero-knowledge proofs become more accessible and seamlessly integrated into various domains, empowering users with enhanced security and privacy guarantees. This development holds immense potential for bringing zero-knowledge proofs to the masses and unlocking their benefits for various applications.
+As the research continues to evolve and mature, we anticipate a
+future where zero-knowledge proofs become more accessible and
+seamlessly integrated into various domains, empowering users with
+enhanced security and privacy guarantees. This development holds
+immense potential for bringing zero-knowledge proofs to the masses
+and unlocking their benefits for various applications.
 
 %\subsection{Payment Channel with Intmax}
 
-%The use of Intmax/Intmax2 enables the achievement of compressing DA (Data Availability) costs, which involve a large number of token transfers, into approximately 4 to 6 bytes within a single transaction. However, most users do not typically consolidate multiple transactions at once. To effectively reduce the cost of each payment consistently regardless of conditions, it is highly beneficial to introduce one-way payment channels.
+%The use of Intmax/Intmax2 enables the achievement of compressing DA
+% (Data Availability) costs, which involve a large number of token
+% transfers, into approximately 4 to 6 bytes within a single
+% transaction. However, most users do not typically consolidate
+% multiple transactions at once. To effectively reduce the cost of
+% each payment consistently regardless of conditions, it is highly
+% beneficial to introduce one-way payment channels.
 
-%Ordinal users typically open dedicated payment channels to intermediaries. These intermediaries then aggregate all the individual payments to different recipients from the users and handle them as a single bulk transfer. The proof of this delegated payment, as a condition of HTLC (Hashed Time Lock Contract), allows for the update of each payment channel. As a result, the 4 to 6-byte DA cost is divided among a large number of users, such as 1000, reducing it to a completely negligible level.
+%Ordinal users typically open dedicated payment channels to
+% intermediaries. These intermediaries then aggregate all the
+% individual payments to different recipients from the users and
+% handle them as a single bulk transfer. The proof of this delegated
+% payment, as a condition of HTLC (Hashed Time Lock Contract), allows
+% for the update of each payment channel. As a result, the 4 to
+% 6-byte DA cost is divided among a large number of users, such as
+% 1000, reducing it to a completely negligible level.
 
-%It is important to note that the balance in a user's one-way payment channel decreases over time, and there is no risk of broadcasting old states and suffering losses. This eliminates the need for nodes and watch-towers from the user side while intermediaries need to be online. As long as payment proofs on Intmax remain verifiable, users can open payment channels on various Layer 2 solutions, enabling extremely low-cost transfers to Intmax addresses from diverse L2 environments.
+%It is important to note that the balance in a user's one-way payment
+% channel decreases over time, and there is no risk of broadcasting
+% old states and suffering losses. This eliminates the need for nodes
+% and watch-towers from the user side while intermediaries need to be
+% online. As long as payment proofs on Intmax remain verifiable,
+% users can open payment channels on various Layer 2 solutions,
+% enabling extremely low-cost transfers to Intmax addresses from
+% diverse L2 environments.
 
 %     \item size of circuit of ZKP (i.e., practicality)

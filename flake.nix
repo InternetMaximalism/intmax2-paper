@@ -2,17 +2,19 @@
   description = "INTMAX2 Paper";
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
-    flake-utils.url = "github:numtide/flake-utils";
     flake-parts.url = "github:hercules-ci/flake-parts";
     treefmt-nix.url = "github:numtide/treefmt-nix";
     treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
+    nixvim = {
+      url = "github:nix-community/nixvim";
+    };
   };
   outputs =
     inputs@{
       self,
       nixpkgs,
-      flake-utils,
       flake-parts,
+      nixvim,
       ...
     }:
     flake-parts.lib.mkFlake { inherit inputs; } {
@@ -24,6 +26,7 @@
       imports = [
         inputs.treefmt-nix.flakeModule
         ./nix/modules/formatter.nix
+        ./nix/vim/vim.nix
       ];
       perSystem =
         {
@@ -68,6 +71,7 @@
               tex
               just
               lazygit
+              self'.packages.mynvim
             ];
           };
           packages = {

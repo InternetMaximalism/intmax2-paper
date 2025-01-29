@@ -1,27 +1,82 @@
-As the blockchain ecosystem continually evolves, so does the urgency for blockchain scaling solutions that preserve security, reduce transaction costs, and improve overall throughput. Layer 2 (L2) technologies, particularly rollups, have emerged as pivotal tools to overcome these challenges, and have thus gathered substantial attention. Among these, Zero-Knowledge rollups (or ZK-rollups) have shown great promise due to their unique capability to bundle numerous transactions into a single proof that can be verified quickly and cheaply onchain. Existing ZK-rollups, while managing to move computation costs away from the underlying Layer 1 (L1) blockchain, are still limited by the fact that all necessary data for verifying users' balances have to be posted on L1. This data, in a typical scenario, includes the transaction sender, the index of the token, the amount, and the recipient for each transaction, thus limiting the number of transactions per second that can be supported by the rollup.
+As the blockchain ecosystem continually evolves, so does the urgency
+for blockchain scaling solutions that preserve security, reduce
+transaction costs, and improve overall throughput. Layer 2 (L2)
+technologies, particularly rollups, have emerged as pivotal tools to
+overcome these challenges, and have thus gathered substantial
+attention. Among these, Zero-Knowledge rollups (or ZK-rollups) have
+shown great promise due to their unique capability to bundle numerous
+transactions into a single proof that can be verified quickly and
+cheaply onchain. Existing ZK-rollups, while managing to move
+computation costs away from the underlying Layer 1 (L1) blockchain,
+are still limited by the fact that all necessary data for verifying
+users' balances have to be posted on L1. This data, in a typical
+scenario, includes the transaction sender, the index of the token,
+the amount, and the recipient for each transaction, thus limiting the
+number of transactions per second that can be supported by the rollup.
 
 \subsection{Data Availability}
 
-A fundamental bottleneck for blockchains is what is known as data availability. Data availability means that transaction data needs to be available in order to be able to prove the current state, such as account balances, of the blockchain. This is a problem for both Layer 1 blockchains and rollups. Layer 1 blockchains usually achieve data availability by requiring that all transaction data is publicly available for a node to consider the blockchain valid. Rollups achieve data availability by leveraging the data availability of the underlying blockchain and require that all transaction data is posted to L1 (e.g. using calldata or blob data on Ethereum). Because this data needs to be replicated among a large set of nodes, there is a limit on how much data can be made available, which limits the number of transactions per second that the blockchain or the rollup can support. While for smart contract blockchains it might be necessary to provide the complete transaction data, it turns out that for simple payment transactions it is only necessary to make available a commitment to the set of transactions in a block (such as a Merkle tree root), together with the set of senders who have signed the commitment, confirming that they have received inclusion proofs of their transactions. Users can then generate Zero-Knowledge proofs (ZK-proofs) of their own balances by combining the inclusion proofs of their sent transactions with the inclusion proofs and ZK-proofs of sufficient balance of each received transaction, which is provided by the transaction sender offchain. Our rollup design uses this method to achieve increased throughput compared to existing alternatives. In addition, the design allows permissionless block building that can happen in parallel, without needing any leader election or any coordination between the block builders. Since the block builders do not verify the validity of the transactions, they can be fully stateless, allowing a very simple and censorship resistant rollup design.
+A fundamental bottleneck for blockchains is what is known as data
+availability. Data availability means that transaction data needs to
+be available in order to be able to prove the current state, such as
+account balances, of the blockchain. This is a problem for both Layer
+1 blockchains and rollups. Layer 1 blockchains usually achieve data
+availability by requiring that all transaction data is publicly
+available for a node to consider the blockchain valid. Rollups
+achieve data availability by leveraging the data availability of the
+underlying blockchain and require that all transaction data is posted
+to L1 (e.g. using calldata or blob data on Ethereum). Because this
+data needs to be replicated among a large set of nodes, there is a
+limit on how much data can be made available, which limits the number
+of transactions per second that the blockchain or the rollup can
+support. While for smart contract blockchains it might be necessary
+to provide the complete transaction data, it turns out that for
+simple payment transactions it is only necessary to make available a
+commitment to the set of transactions in a block (such as a Merkle
+tree root), together with the set of senders who have signed the
+commitment, confirming that they have received inclusion proofs of
+their transactions. Users can then generate Zero-Knowledge proofs
+(ZK-proofs) of their own balances by combining the inclusion proofs
+of their sent transactions with the inclusion proofs and ZK-proofs of
+sufficient balance of each received transaction, which is provided by
+the transaction sender offchain. Our rollup design uses this method
+to achieve increased throughput compared to existing alternatives. In
+addition, the design allows permissionless block building that can
+happen in parallel, without needing any leader election or any
+coordination between the block builders. Since the block builders do
+not verify the validity of the transactions, they can be fully
+stateless, allowing a very simple and censorship resistant rollup design.
 
 \subsection{Our Contributions}
 
 Intmax2 is an efficient and stateless rollup design that:
 
 \begin{itemize}
-	\setlength\itemsep{0.35em}
+    \setlength
+  \itemsep{0.35em}
 
-	\item Uses less onchain data than any existing rollup, giving an upper limit of 7500 transaction batches per second on Ethereum, where each transaction batch can transfer an unlimited number of tokens to an unlimited number of recipients.
+  \item Uses less onchain data than any existing rollup, giving an
+    upper limit of 7500 transaction batches per second on Ethereum,
+    where each transaction batch can transfer an unlimited number of
+    tokens to an unlimited number of recipients.
 
-	      % %MY: maybe change phrasing
-	      % \item Shifts the computational requirements from the aggregator to the client, making it highly scalable with the number of users.
+    % %MY: maybe change phrasing
+    % \item Shifts the computational requirements from the aggregator
+    % to the client, making it highly scalable with the number of users.
 
-	\item Offers permissionless block production.
+  \item Offers permissionless block production.
 
-	\item Provides stronger privacy properties than traditional ZK-rollups.
+  \item Provides stronger privacy properties than traditional ZK-rollups.
 
 \end{itemize}
 
 \subsection{Formal verification of the security proof}
 
-We give a pen-and-paper proof of the security of the protocol in \Cref{thm:rollup-contract-is-secure}. This proof has been formally verified in the Lean theorem prover\cite{demoura2021the} by the Nethermind Formal Verification team \cite{nethermind}. All mathematical definitions and statements that are needed for the security proof contain a hyperlink (like this: \href{https://github.com/\repo FVIntmax/}{\ExternalLink}) to the formalized version.
+We give a pen-and-paper proof of the security of the protocol in
+\Cref{thm:rollup-contract-is-secure}. This proof has been formally
+verified in the Lean theorem prover\cite{demoura2021the} by the
+Nethermind Formal Verification team \cite{nethermind}. All
+mathematical definitions and statements that are needed for the
+security proof contain a hyperlink (like this:
+\href{https://github.com/\repo FVIntmax/}{\ExternalLink}) to the
+formalized version.
