@@ -4,7 +4,7 @@ default:
 
 # run latexmk
 latexmk:
-    latexmk -pdf -pvc
+    latexmk -pdf -pvc -interaction=nonstopmode | pplatex -i - -q
 
 # format all files in the repo
 fmt:

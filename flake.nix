@@ -68,6 +68,7 @@
               config.treefmt.build.devShell
             ];
             buildInputs = with pkgs; [
+              pplatex
               tex
               just
               lazygit

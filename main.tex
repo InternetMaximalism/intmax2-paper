@@ -575,7 +575,8 @@ We now define various preorders used in the paper.
 \begin{defn}
   Let \((X,\leq)\) be a proset, let \((x_i)_{i \in I}\) be an indexed
   family of elements of \(X\) and let \(x \in X\). We say that \(x\)
-  is a \emph{join} of \((x_i)_{i \in I}\) if the following two properties hold:
+  is a \emph{join} of \((x_i)_{i \in I}\) if the following two
+  properties hold:
   \begin{itemize}
     \item \(x_i \leq x\) for all \(i \in I\)
     \item if \(x' \in X\) is an element such that \(x_i \leq x'\) for
@@ -758,26 +759,31 @@ transactions. We now describe the steps in more details.
 The first step of calculating balances is to extract a list of
 \emph{partial transactions} from a balance proof \(\pi\) and the
 current list of blocks in the rollup \(B_*\). The set of partial
-transactions, denoted \(\T\), is defined as the subset
-\[\T \subseteq
-\overline{\K}^2 \times Maybe(\V_+)\] consisting of the tuples
-\(((s,r),v)\) where \(s \neq r\) and where \(s = \source\) implies
-\(v \neq \bot\) \href{https://github.com/\repo
-FVIntmax/Transaction.lean#L38}{\ExternalLink}. The process of
-extracting the list of partial transactions is described by a
+transactions is defined as
+
+\[\T := Maybe(\V)^{\overline{\K}}.\]
+
+The process of extracting the list of partial transactions is described by a
 function \[\mathsf{TransactionsInBlocks} \colon \Pi \times B^* \to
-\T^*\] which we will now define. Given a deposit block \((r,v) \in
-\B_{deposit}\), we extract the one-element list consisting of the
-partial transaction \(((\source,r),v)\)
-\href{https://github.com/\repo FVIntmax/Balance.lean#L38}{\ExternalLink}:
+\T^*\] which we will now define.
 
 \[
   \begin{aligned}[t]
-    \mathsf{TransactionsInBlock}_{deposit} \colon \B_{deposit} & \to
+    \mathsf{TransactionsInBlock}_{explicit} \colon \B_{explicit} & \to
     \T^*                   \\
-    (r,v)                                                      &
-    \mapsto (((\source,r),v)).
-\end{aligned}\]
+    B                                                      &
+    \mapsto
+    B
+  \end{aligned}
+\]
+
+For each \(s \in \overline{\K}\) we define \(\bot(s) \in \T\) as
+\[ \bot(s)_k :=
+  \begin{cases}
+    \bot, &\text{if \(k = s\)} \\
+    0, &\text{otherwise.}
+  \end{cases}
+\]
 
 We then define the function \href{https://github.com/\repo
 FVIntmax/Balance.lean#L61}{\ExternalLink}
@@ -791,30 +797,18 @@ FVIntmax/Balance.lean#L61}{\ExternalLink}
 for extracting a list of partial transactions from a balance proof
 and a transfer block as follows. Given a balance proof \(\pi \in
 \Pi\) and a transfer block \((aggregator,extradata,C,S,\sigma) \in
-B_{transfer}\), we take, for each sender-recipient pair \((s,r) \in
-\K_2 \times \K\) where \(s \neq r\), in lexicographic order, the
-partial transaction \(((s,r),v)\) where
-\href{https://github.com/\repo FVIntmax/Balance.lean#L76}{\ExternalLink} \[v =
+B_{transfer}\), we take, for each sender \(s \in
+\K_2\) in order, the
+partial transaction \(v \in \T\) where
+\href{https://github.com/\repo
+FVIntmax/Balance.lean#L76}{\ExternalLink} \[v =
   \begin{cases}
-    t(r), \text{ where } (\_,t) = \pi(C,s), & \text{if \(s \in S\)
+    t, \text{ where } (\_,t) = \pi(C,s), & \text{if \(s \in S\)
     and \(\pi(C,s) \neq \bot\)} \\
-    \bot,                                   & \text{if \(s \in S\)
+    \bot(s),                                   & \text{if \(s \in S\)
     and \(\pi(C,s) = \bot\)}    \\
     0,                                      & \text{if \(s \notin S\).}
 \end{cases}\]
-
-Given a withdrawal block, the list of transactions extracted from it
-consists of a transaction from each L1 account to the source account
-in order \href{https://github.com/\repo
-FVIntmax/Balance.lean#L104}{\ExternalLink}:
-
-\[
-  \begin{aligned}[t]
-    \mathsf{TransactionsInBlock}_{withdrawal} \colon \B_{withdrawal}
-    & \to \T^*                               \\
-    B
-    & \mapsto ((s,\source),B_s)_{s \in K_1}.
-\end{aligned}\]
 
 We combine these functions into one function for extracting partial
 transactions from a balance proof and a block
@@ -826,13 +820,10 @@ transactions from a balance proof and a block
     (\pi,B)                                           & \mapsto
     \begin{cases}
 
-      \mathsf{TransactionsInBlock}_{deposit}(B),      & \text{if \(B
-      \in \B_{deposit}\)}    \\
+      \mathsf{TransactionsInBlock}_{explicit}(B),      & \text{if \(B
+      \in \B_{explicit}\)}    \\
       \mathsf{TransactionsInBlock}_{transfer}(\pi,B), & \text{if \(B
-      \in \B_{transfer}\)}   \\
-
-      \mathsf{TransactionsInBlock}_{withdrawal}(B),   & \text{if \(B
-      \in \B_{withdrawal}\)}
+      \in \B_{transfer}\)}
     \end{cases}.
 \end{aligned}\]
 
@@ -846,7 +837,8 @@ block and concatenate the lists of partial transactions
     \mathsf{TransactionsInBlocks} \colon \Pi \times B^* & \to \T^*
     \\
     (\pi, (B_i)_{i \in [n]})                            & \mapsto
-    \mathsf{Concatenate}((\mathsf{TransactionsInBlock}(\pi,B_i))_{i \in [n]}).
+    \mathsf{Concatenate}((\mathsf{TransactionsInBlock}(\pi,B_i))_{i
+    \in [n]}).
 \end{aligned}\]
 
 \subsection{Step 2: Computing balances from a list of partial transactions}
@@ -875,276 +867,42 @@ order to define the transition function \(f\), we will first define a
 different transition function \(f_c : \T_c \times \S \to \S\), where
 the set of transactions is the subset \(\T_c \subseteq \T\), called
 the \emph{complete transactions}, consisting of the transactions
-\(((s,r),v) \in \T\) where \(v \neq \bot\). For all \(i \in
-\overline{\K}\), let \(\mathbf{e}_i \in \Z^{\overline{\K}}\) be the
-map where \[(\mathbf{e}_i)_{j} =
-  \begin{cases}
-    1, & \text{if \(i = j\)}
-    \\
-    0, & \text{otherwise.} \href{https://github.com/\repo
-    FVIntmax/Balance.lean#L252}{\ExternalLink}
-\end{cases}\] Then, for all complete transactions \(((s,r),v) \in
-\T_c\) and for all \(b \in \S\) and \(k \in \overline{\K}\) we define
+\(v \in \T\) where \(v_k \neq \bot \, \forall k \in \overline{\K}\),
+and where \[\sum_{k \in \overline{\K}} v_k \leq 0.\]
+
+For all complete transactions \(v \in
+\T_c\) and for all \(b \in \S\) we define
 \href{https://github.com/\repo FVIntmax/Balance.lean#L308}{\ExternalLink}
 
 \begin{align*}
-  f_c(((s,r),v),b)_k & :=
-  \begin{aligned}[t]
-    & b_k + (\mathbf{e}_r - \mathbf{e}_s)_k \cdot v', \\
-    & \text{where } v' :=
-    \begin{cases}
-      v \wedge b_s, & \text{ if \(s \neq \source\)} \\
-      v,            & \text{ if \(s = \source\)}.
-    \end{cases}
-  \end{aligned}
+  f_c(v,b) & :=
+  \begin{cases}
+    b + v, & \text{ if \(b + v \in \S\)} \\
+    b,            & \text{otherwise}.
+  \end{cases}
 \end{align*}
 
-\begin{rmk}
-  In the definition above, the minus operation in \(\mathbf{e}_r -
-  \mathbf{e}_s\) comes from the abelian group structure on
-  \(\Z^{\overline{K}}\), and the product operation in \((\mathbf{e}_r
-  - \mathbf{e}_s) \cdot v'\) is the scalar multiplication coming from
-  the natural \(\Z\)-module structure on the abelian group \(\V\).
-\end{rmk}
-
-\begin{rmk}
-  The transition function above is explained as follows. To apply a
-  transaction where a non-source sender \(s\) sends the amount \(v\)
-  to a recipient \(r\), we first reduce the transacted amount \(v\)
-  to the amount \(v'\), which is the greatest amount that is both
-  less than the original value \(v\) (the sender shouldn't send more
-  than in the original transaction) and less than the balance of the
-  sender \(b_s\) (to avoid overspending). The reduced value \(v'\) is
-  then subtracted from the sender and added to the recipient. The
-  source account is considered to have sufficient balance for all of
-  its transactions, so if the sender is the source account, the
-  transaction value is not reduced.
-\end{rmk}
-
 Before we can define the transition function \(f : \T \times \S \to
-\S\), we will define a preorder on \(\T\) and \(\S\). In the
+\S\), we will define a partial order on \(\T\) and \(\S\). In the
 following definitions, we apply the inductions from
-\Cref{section:examples-of-preorders}. To get the preorder on \(\T\),
-recall that \(\T\) is a subset of \(\overline{\K}^2 \times
-Maybe(\V_+)\). We first equip \(\overline{\K}^2\) with the discrete
-preorder \href{https://github.com/\repo
-FVIntmax/Balance.lean#L338}{\ExternalLink}. Then we equip \(\V_+\)
-with the discrete preorder \href{https://github.com/\repo
-FVIntmax/Balance.lean#L340}{\ExternalLink}, which induces a preorder
-on \(Maybe(\V_+)\) \href{https://github.com/\repo
-FVIntmax/Balance.lean#L359}{\ExternalLink}. We then get the induced
-product preorder on \(\overline{\K}^2 \times Maybe(\V_+)\)
-\href{https://github.com/\repo
-FVIntmax/Balance.lean#L366}{\ExternalLink}, and an induced subset
-preorder on the subset \(\T\) \href{https://github.com/\repo
-FVIntmax/Balance.lean#L374}{\ExternalLink}. To get the preorder on
-\(\S = \V^{\overline{\K}}\), we use the underlying preorder on \(\V\)
-coming from the fact that \(\V\) is a lattice
-\href{https://github.com/\repo
-FVIntmax/Balance.lean#L381}{\ExternalLink}, and give \(\S\) the
-subset preorder \href{https://github.com/\repo
-FVIntmax/Balance.lean#L390}{\ExternalLink}. Given these preorders on
-\(\T\) and \(\S\), we get an induced product preorder on \(\T \times
-\S\) \href{https://github.com/\repo
-FVIntmax/Balance.lean#L397}{\ExternalLink} which we denote simply by \(\leq\).
-
-\begin{lemma}\label{thm:lem1}
-  Let \(X\) and \(Y\) be preorders and let \(f : X \to Y\) be a
-  monotone function. Then, for all \(x \in X\) we have
-  \[\bigwedge_{\substack{x' \in X \\ x \leq x'}} f(x') = f(x).\]
-\end{lemma}
-
-\begin{proof}
-  Let \(x \in X\) and let \(S_x = \{f(x') \, | \, x' \in X, \, x \leq
-  x'\}\). We need to show that \(f(x)\) is the greatest lower bound
-  of \(S_x\). First, since \(f\) is monotone, we have that \(f(x)
-  \leq f(x')\) for all \(x' \in X\), which implies that \(f(x)\) is a
-  lower bound of \(S_x\). Since \(f(x) \in S_x\), it is also the
-  greatest lower bound of \(S_x\).
-\end{proof}
-
-\begin{lemma}\label{thm:non-sender-balances-increases}
-  \href{https://github.com/\repo
-  FVIntmax/Balance.lean#L326}{\ExternalLink}For all \(T = ((s,r),v)
-  \in \T_c\) and \(b \in \S\), and for all \(k \in \overline{K}
-  \backslash \{s\}\) we have \(b_k \leq f_c(T,b)_k.\) In other words,
-  when applying the transition function to a complete transactions,
-  only the sender's balance may decrease.
-\end{lemma}
-
-\begin{proof}
-  Let \(T = ((s,r),v) \in \T_c\), \(b \in \S\) and \(k \in
-  \overline{K} \backslash \{s\}\). By definition, we have
-
-  \begin{align*}
-    f_c(((s,r),v),b)_k & :=
-    \begin{aligned}[t]
-      & b_k + (\mathbf{e}_r - \mathbf{e}_s)_k \cdot v', \\
-      & \text{where } v' :=
-      \begin{cases}
-        v \wedge b_s, & \text{ if \(s \neq \source\)} \\
-        v,            & \text{ if \(s = \source\)}.
-      \end{cases}
-    \end{aligned}
-  \end{align*}
-
-  We first show that \(v' \geq 0\). We have two cases, either \(s =
-  \source\) or \(s \neq \source\).
-
-  \begin{description}
-    \item[Case \(s \neq \source\).] In this case we have \(v' = v
-      \wedge b_s\). By definition, we have \(v \geq 0\). Also, since
-      \(s \neq \source\), we also have \(b_s \geq 0\) by the
-      definition of the set of states \(\S\). These two facts imply
-      \(v' = v \wedge b_s \geq 0\).
-
-    \item[Case \(s = \source\).] In this case we have \(v' = v \geq 0\).
-  \end{description}
-
-  We have now shown that \(v' \geq 0\). It follows that
-  \(f_c(((s,r),v),b)_k = b_k + (\mathbf{e}_r - \mathbf{e}_s)_k \cdot
-  v' \geq b_k\), which was what we needed to show.
-\end{proof}
-
-\begin{prop}\label{thm:fc-is-monotone}
-  \href{https://github.com/\repo
-  FVIntmax/Balance.lean#L483}{\ExternalLink}The transition function
-  for complete transactions \(f_c : \T_c \times \S \to \S\) is monotone.
-\end{prop}
-
-\begin{proof}
-  Let \(T = ((s,r),v) \in \T_c\) be a complete transaction. We have
-  two cases to consider, either \(s = \source\) or \(s \neq
-  \source\). Suppose \(s = \source\). Then, for all \(b \leq b' \in
-  \S\) and \(k \in \overline{\K}\) we have
-  \begin{align*}
-    f_c(T,b)_k & = b_k + (\mathbf{e}_r - \mathbf{e}_s)_k \cdot v     \\
-    & \leq b'_k + (\mathbf{e}_r - \mathbf{e}_s)_k \cdot v \\
-    & = f_c(T, b')_k,
-  \end{align*}
-
-  so \(f_c\) is monotone in this case. Now, suppose \(s \neq
-  \source\). Then, for all \(b \in \V^{\overline{\K}}\) and \(k \in
-  \overline{\K}\), we get \[
-    f_c(T,b)_k =
-    \begin{cases}
-      b_s - v \wedge b_s = (b_s - v) \vee 0, & \text{ if \(k = s\)} \\
-      b_r + v \wedge b_s,                    & \text{ if \(k = r\)} \\
-      b_k,                                   & \text{ otherwise.}
-    \end{cases}
-  \] We observe that the transition function is monotone in all three
-  cases. We conclude that \(f_c\) is monotone.
-\end{proof}
-
-\begin{prop}
-  \href{https://github.com/\repo
-  FVIntmax/Balance.lean#L564}{\ExternalLink}For any \(T \in \T\), \(b
-  \in \S\) and \(k \in \overline{\K}\), the infimum
-
-  \[\bigwedge_{\substack{(T',b') \in \T_c \times \S \\ (T,b) \leq
-  (T',b')}} f_c(T',b')_k\]
-
-  exists in \(\V\) and
-
-  \[
-    \bigwedge_{\substack{(T',b') \in \T_c \times \S \\ (T,b) \leq
-    (T',b')}} f_c(T',b') =
-    \begin{cases}
-      f_c(T,b)_k, & \text{if \(v \neq \bot\)}                \\
-      0,          & \text{if \(v = \bot\) and \(k = s\)}     \\
-      b_k,        & \text{if \(v = \bot\) and \(k \neq s\).}
-    \end{cases}
-  \]
-\end{prop}
-
-\begin{proof}
-  Let \(T = ((s,r),v) \in \T\), \(b \in \S\) and \(k \in
-  \overline{\K}\). We will consider two cases, either \(v = \bot\) or
-  \(v \neq \bot\).
-
-  \begin{description}
-    \item[Case \(v \neq \bot\).] This is the case where the
-      transaction \(T\) is complete. We need to show that in this
-      case we have \[\bigwedge_{\substack{(T',b') \in \T_c \times \S
-      \\ (T,b) \leq (T',b')}} f_c(T',b')_k = f_c(T,b)_k.\] Since
-      \(f_c\) is monotone, this follows from \Cref{thm:lem1}.
-
-    \item[Case \(v = \bot\).] This is the case where the transaction
-      \(T\) is incomplete. We need to show that in this case we have
-      \[\bigwedge_{\substack{(T',b') \in \T_c \times \S \\ (T,b) \leq
-        (T',b')}} f_c(T',b')_k =
-        \begin{cases}
-          0,   & \text{if \(k = s\)}     \\
-          b_k, & \text{if \(k \neq s\).}
-      \end{cases}\]
-
-      First, since \(f_c\) is monotone (\Cref{thm:fc-is-monotone}),
-      we can reduce to showing \[\bigwedge \V' =
-        \begin{cases}
-          0,   & \text{if \(k = s\)}    \\
-          b_k, & \text{if \(k \neq s\)}
-      \end{cases}\] where \(\V' = \{f_c(T',b)_k \, | \, T' \in T_c, T
-      \leq T'\}\). We will split into the two cases, \(k = s\) and \(k \neq s\).
-
-      \begin{description}
-        \item[Case \(k = s\). ] We need to show that in this case we
-          have \(\bigwedge \V' = 0\). By definition of the set of
-          states \(\S\), all elements of \(V'\) are positive, so 0 is
-          a lower bound of \(V'\). Also, since \(T \leq
-          ((s,r),b_s)\), we have \(f_c(((s,r),b_s),b)_k = 0 \in
-          \V'\), so 0 is also the greatest lower bound of \(V'\).
-
-        \item[Case \(k \neq s\). ] We need to show that in this case
-          we have \(\bigwedge \V' = b_k\). By
-          \Cref{thm:non-sender-balances-increases}, we have that
-          \(b_k\) is a lower bound of \(V'\). Also, since \(T \leq
-          ((s,r),0)\), we have \(f_c(((s,r),0),b)_k = b_k \in \V'\),
-          so \(b_k\) is also the greatest lower bound of \(V'\).
-      \end{description}
-  \end{description}
-\end{proof}
-
-Then we get the following definition.
+\Cref{section:examples-of-preorders}. First, the partial order on
+\(\V\) is the partial order coming from the fact that \(\V\) is a
+lattice. This induces a partial order on \(Maybe(\V)\), where
+\(\bot\) is the bottom element. We then get an induced partial order
+on \(T = Maybe(\V)\), of which \(\S\) is a subset. We then give
+\(\S\) the induced subset partial order.
 
 \begin{defn}\label{defn:transition-function}
-  \href{https://github.com/\repo
-  FVIntmax/Balance.lean#L628}{\ExternalLink}For all \(T \in \T\) and
-  \(b \in \S\), we define \[f(T,b) := \bigwedge_{\substack{(T',b')
-  \in \T_c \times \S \\ (T,b) \leq (T',b')}} f_c(T',b').\]
+  A \emph{transition function for partial transactions} is a monotone function
+  \[f : \T \times \S \to \S\] such that
+  \[f(t,b) \leq f_c(t',b')\] for all \((t',b') \in \T_c \times \S\)
+  where \((t,b) \leq (t',b')\).
 \end{defn}
 
-\begin{rmk}
-  In other words, if the transaction is complete, the transition
-  function \(f\) behaves exactly as the transition function \(f_c\)
-  for complete transactions. If the transaction is incomplete, the
-  transition function sets the balance of the sender to 0 and leaves
-  all other balances unchanged.
-\end{rmk}
-
-\begin{rmk}
-  The definition of the transition function \(f\) is somewhat
-  abstract, but the idea is this. If we have a sequence of complete
-  transactions (as in any traditional blockchain), we can compute the
-  balance of each account by applying the transition function for
-  complete transactions \(f_c\). If some of the transactions are
-  unknown, however, we cannot know for sure what the balance of each
-  account is. Instead, we will compute a \emph{lower bound} on the
-  balance of each account. When we apply the transition function
-  \(f\) to a partial transaction \(T \in \T\) and a state \(b \in
-  \S\), we interpret \(b\) as the current lower bound on the true,
-  but unknown state \(b' \in \S\) where \(b \leq b'\), and we
-  interpret the partial transaction \(T\) as the lower bound of the
-  true (but unknown if \(v = \bot\)) transaction \(T' \in \T_c\),
-  where \(T \leq T'\). Since the true transaction \(T'\) and the true
-  state \(b'\) are unknown to us, we need to consider the result of
-  applying the transition function \(f_c\) to all possible values of
-  \(T'\) and \(b'\), and take their meet to get the updated lower
-  bound. We note that the construction where we extend the function
-  \(f_c\) to \(f\) is a well-known construction in category theory
-  called a \emph{Kan extension} (see eg. \cite{mac2013categories}).
-\end{rmk}
-
-The transition function \(f: \T \times \S \to \S\) induces the
+In the remainder of the protocol descripiton, let \[f : \T \times \S
+\to \S\] be a transition function for partial transactions (called
+just the \emph{transition function}). The
+transition function \(f: \T \times \S \to \S\) induces the
 function \(f^* : \T^* \times \S \to \S\) which takes a list of
 transactions \(T_* \in \T^*\) and an initial state \(s_0 \in \S\) and
 returns the state obtained by applying the transition function \(f\),
@@ -1175,7 +933,8 @@ contract. Informally speaking, we say that the rollup contract is
 secure if every withdrawal request succeeds, i.e. the rollup contract
 has sufficient balance for every withdrawal. This means that if a
 user has a balance proof which proves the in-rollup balance of one or
-more of their L1 accounts, they will be able to withdraw these balances to L1.
+more of their L1 accounts, they will be able to withdraw these
+balances to L1.
 
 \subsection{Formal description of the rollup contract}
 
@@ -1185,7 +944,8 @@ We formally define the rollup contract.
   \href{https://github.com/\repo
   FVIntmax/Block.lean#L115}{\ExternalLink}The rollup contract state
   consists of the list of blocks that have been added to the rollup.
-  Formally, we define the set of contract states as \[\S_{contract} := \B^*.\]
+  Formally, we define the set of contract states as
+  \[\S_{contract} := \B^*.\]
 \end{defn}
 
 \begin{defn}
@@ -1213,7 +973,8 @@ We formally define the rollup contract.
   \href{https://github.com/\repo
   FVIntmax/Request.lean#L147}{\ExternalLink}      \[
     \begin{aligned}[t]
-      \mathsf{ToBlock}_{transfer} \colon \R_{transfer} & \to \B_{transfer} \\
+      \mathsf{ToBlock}_{transfer} \colon \R_{transfer} & \to
+      \B_{transfer} \\
       B                                                & \mapsto B
   \end{aligned}\]
 \end{defn}
@@ -1224,7 +985,8 @@ We formally define the rollup contract.
     \begin{aligned}[t]
       \mathsf{ToBlock}_{withdrawal} \colon \R_{withdrawal} \times
       \B^* & \to \B_{withdrawal} \\
-      (\pi, B_*)                                                       & \mapsto
+      (\pi, B_*)
+      & \mapsto
       \mathsf{Bal}(\pi,B_*)\vline_{K_1}
   \end{aligned}\]
 \end{defn}
@@ -1262,11 +1024,13 @@ We formally define the rollup contract.
       \\
       (R, s)                                                & \mapsto
       \begin{cases}
-        True,                 & \text{ if \(R \in \R_{deposit}\)}          \\
+        True,                 & \text{ if \(R \in \R_{deposit}\)}
+        \\
         \mathsf{SA.Verify}(S,(C,agg,e),\sigma)
         \\ \wedge \, s = agg, &\text{ if \(R = (agg, e, C, S, \sigma)
         \in \R_{transfer}\)} \\
-        \mathsf{Verify}(\pi), & \text{ if \(R = \pi \in \R_{withdrawal}\)} \\
+        \mathsf{Verify}(\pi), & \text{ if \(R = \pi \in
+        \R_{withdrawal}\)} \\
       \end{cases}
     \end{aligned}
   \]
@@ -1368,10 +1132,10 @@ first prove some properties of the balance function.
 
 \begin{proof}
   We start by noticing that the transition function for complete
-  transactions \(f_c\) preserves the sum of account balances, i.e.
+  transactions \(f_c\) decreases the sum of account balances, i.e.
   \href{https://github.com/\repo FVIntmax/Lemma3.lean#L21}{\ExternalLink}
   \begin{equation*}
-    \sum_{k \in \overline{\K}} f_c(T,b)_k = \sum_{k \in
+    \sum_{k \in \overline{\K}} f_c(T,b)_k \leq \sum_{k \in
     \overline{\K}} b_k, \quad \forall T \in \T_c,\, b \in \S.
   \end{equation*} This implies the following fact about the
   transition function for partial transactions \(f\)
@@ -1383,10 +1147,12 @@ first prove some properties of the balance function.
   Then, it follows by induction that we have
   \href{https://github.com/\repo FVIntmax/Lemma3.lean#L79}{\ExternalLink}
   \begin{equation}\label{eqn:sum-of-balances-is-negative}
-    \sum_{k \in \overline{\K}} f_*(T_*,0)_k \leq 0, \quad \forall T_* \in \T^*.
+    \sum_{k \in \overline{\K}} f_*(T_*,0)_k \leq 0, \quad \forall
+    T_* \in \T^*.
   \end{equation}
   Finally, for all balance proofs \(\pi \in \Pi\) and block lists
-  \(B_* \in \B^*\), letting \(T_* = \mathsf{TransactionsInBlocks}(B_*)\) we have
+  \(B_* \in \B^*\), letting \(T_* =
+  \mathsf{TransactionsInBlocks}(B_*)\) we have
   \begin{align*}
     \mathsf{Bal}(\pi,B_*)_\source & = f^*(T_*,0)_\source
     &  & \text{(by definition)}                              \\
@@ -1405,92 +1171,34 @@ first prove some properties of the balance function.
 The next lemma relies on a preorder structure on the set of balance proofs.
 
 \begin{defn}
-  \href{https://github.com/\repo
-  FVIntmax/Balance.lean#L450}{\ExternalLink}We give \[\Pi =
+  We give \[\Pi =
     Dict(\mathsf{AD}.\C \times \K_2, (\mathsf{AD}.\Pi \times \{0,1\}^*)
-  \times \V_+^{\K})\] a preorder as follows. First, we give
-  \(\V^{\K}_+\) the discrete preorder \href{https://github.com/\repo
-  FVIntmax/Balance.lean#L407}{\ExternalLink}. Then, we give
-  \(\mathsf{AD}.\Pi \times \{0,1\}^*\) the trivial preorder
-  \href{https://github.com/\repo
-  FVIntmax/Balance.lean#L433}{\ExternalLink}. Finally, we give
+  \times \T)\] a preorder as follows. First, we give
+  \(\mathsf{AD}.\Pi \times \{0,1\}^*\) the trivial preorder. Then, we give
   \((\mathsf{AD}.\Pi \times \{0,1\}^*) \times \V_+^{\K}\) the induced
-  product preorder \href{https://github.com/\repo
-  FVIntmax/Balance.lean#L449}{\ExternalLink}, and \(\Pi\) the induced
-  dictionary preorder \href{https://github.com/\repo
-  FVIntmax/Balance.lean#L450}{\ExternalLink}.
+  product preorder, and \(\Pi\) the induced
+  dictionary preorder.
 \end{defn}
 
-\begin{lemma}\label{thm:bal-is-monotone}
-  \href{https://github.com/\repo
-  FVIntmax/Lemma4.lean#L292}{\ExternalLink}The balance function
-  \[\mathsf{Bal} : \Pi \times B^* \to \S\] is monotone in its first argument.
-\end{lemma}
+\begin{prop}\label{thm:transactions-in-blocks-is-monotone}
+  The function \(\mathsf{TransactionsInBlocks}\) is monotone.
+\end{prop}
+
+\begin{prop}\label{thm:f-star-is-monotone}
+  The function \(f^*\) is monotone.
+\end{prop}
 
 \begin{proof}
-  Let \(B_* \in \B^*\). We can decompose the function
-  \(\mathsf{Bal}(-,B_*) : \Pi \to \S\) as follows
-  \href{https://github.com/\repo
-  FVIntmax/Lemma4.lean#L71}{\ExternalLink}: \[\Pi
-    \xrightarrow{\mathsf{TransactionsInBlocks}(-,B_*)} \T^*
-  \xrightarrow{f^*(-,0)} \S.\] Note that the function
-  \(\mathsf{TransactionsInBlocks}\) outputs a list of partial
-  transactions whose length is only dependent on the second argument
-  (the list of blocks). This means that since \(B_*\) is fixed, we
-  can replace \(\T^*\) by \(\T^{[n]}\) above, for some integer \(n\)
-  \href{https://github.com/\repo
-  FVIntmax/Lemma4.lean#L102}{\ExternalLink}: \[\Pi
-    \xrightarrow{\mathsf{TransactionsInBlocks}(-,B_*)} \T^{[n]}
-  \xrightarrow{f^*(-,0)} \S.\]
+  This follows by induction.
+\end{proof}
 
-  We give \(\T^{[n]}\) the preorder structure induced by the preorder
-  on \(\T\) \href{https://github.com/\repo
-  FVIntmax/Wheels.lean#L170}{\ExternalLink}. Then, to prove that the
-  balance function is monotone in its first argument, it suffices to
-  show (by \Cref{thm:composition-is-monotone}) that the two functions
-  in the above decomposition are monotone.
+\begin{prop}\label{thm:bal-is-monotone}
+  The balance function \[\mathsf{Bal} : \Pi \times B^* \to \S\] is monotone.
+\end{prop}
 
-  We first show that the function
-  \(\mathsf{TransactionsInBlocks}(-,B_*)\) is monotone
-  \href{https://github.com/\repo
-  FVIntmax/Lemma4.lean#L203}{\ExternalLink}. Let \(\pi, \pi' \in
-  \Pi\) be balance proofs where \(\pi \leq \pi'\), and let \(T_* =
-  \mathsf{TransactionsInBlocks}(\pi,B_*)\) and \(T'_* =
-  \mathsf{TransactionsInBlocks}(\pi',B_*)\). We need to show that
-  \(T_i \leq T'_i\) for all \(i \in [n]\). Let \(i \in [n]\), and let
-  \(((s,r),v) = T_i\) and \(((s',r'),v') = T'_i\). Notice first that
-  we have \((s,r) = (s',r')\), since by construction, we have that
-  the sender and recipient of the transaction at a given index in the
-  list of partial transactions extracted from a balance proof and
-  block list is only determined by the arrangement of the three block
-  types in the block list \href{https://github.com/\repo
-  FVIntmax/Lemma4.lean#L124}{\ExternalLink}. Then, we realize that
-  the only way the two transactions \(T_i\) and \(T'_i\) can differ,
-  is if they are both extracted from the same transfer block \(B\),
-  and if \(\pi'\) contains a proof of the transaction from \(s\) in
-  \(B\), and \(\pi\) doesn't. In this case, we have \(v = \bot\), so
-  we get \(((s,r),v) \leq ((s',r'),v')\)
-  \href{https://github.com/\repo FVIntmax/Lemma4.lean#L184}{\ExternalLink}.
-
-  It remains to show that the function \(f^*(-,0)\), considered as a
-  function from \(\T^{[n]}\) to \(\S\) is monotone
-  \href{https://github.com/\repo
-  FVIntmax/Lemma4.lean#L270}{\ExternalLink}. To show this, we first
-  notice that the transition function \(f\) is monotone, since if
-  \((T_1,b_1) \leq (T_2,b_2)\), we get
-  \begin{align*}
-    f(T_1,b_1) & = \bigwedge_{\substack{(T',b') \in \T_c \times \S
-    \\ (T_1,b_1) \leq (T',b')}} f_c(T',b') && \text{(By definition)} \\
-    & \leq \bigwedge_{\substack{(T',b') \in \T_c \times \S
-    \\ (T_2,b_2) \leq (T',b')}} f_c(T',b') && \text{(Since we take
-    the meet of a smaller set of elements)} \\
-    & = f(T_2,b_2)                                         &  &
-    \text{(By definition)}.
-  \end{align*}
-
-  It then follows by induction that \(f^*\) is also monotone, and in
-  particular we conclude that \(f^*(-,0)\) is monotone
-  \href{https://github.com/\repo FVIntmax/Lemma4.lean#L292}{\ExternalLink}.
+\begin{proof}
+  This follows from \Cref{thm:transactions-in-blocks-is-monotone} and
+  \Cref{thm:f-star-is-monotone}.
 \end{proof}
 
 \begin{lemma}\label{thm:source-balance}
@@ -1517,8 +1225,10 @@ The next lemma relies on a preorder structure on the set of balance proofs.
 % have \begin{equation}\label{eqn:balance-sum-is-negative}
 %     \sum_{k \in \overline{\K}} b_k \leq 0
 %     \end{equation}
-%     and \begin{equation}\label{eqn:non-source-accounts-have-positive-balances}
-%         b_k \geq 0, \quad \forall k \in \overline{\K} \backslash \{\source\}.
+%     and
+% \begin{equation}\label{eqn:non-source-accounts-have-positive-balances}
+%         b_k \geq 0, \quad \forall k \in \overline{\K} \backslash
+% \{\source\}.
 %     \end{equation}
 % We prove these facts by induction on the length of \(t_*\). In the
 % base case, where \(t_* = ()\) is the empty list, we have \(b =
@@ -1537,7 +1247,8 @@ The next lemma relies on a preorder structure on the set of balance proofs.
 % \begin{align*}
 %     f^*(t_*,0)_\source &= \sum_{k \in \overline{\K}} f^*(t_*,0)_k -
 % \sum_{k \in \overline{\K} \backslash \{\source\}} f^*(t_*,0)_k \\
-%     &\leq - \sum_{k \in \overline{\K} \backslash \{\source\}} f^*(t_*,0)_k \\
+%     &\leq - \sum_{k \in \overline{\K} \backslash \{\source\}}
+% f^*(t_*,0)_k \\
 %     &\leq 0
 % \end{align*}
 %\end{proof}
@@ -1553,7 +1264,8 @@ The next lemma relies on a preorder structure on the set of balance proofs.
 %   Let \[g(t,b) = \bigwedge_{\substack{t' \in \T_c \\ t \leq_p t'
 % \\ b \leq b'}} f_c(t',b').\] We need to show that \(f(t,b) =
 % g(t,b)\) for all \(t \in \T\) and \(b \in \S\). Let \(t = (s,r,v)
-% \in \T\). If \(v = \bot\), we have, by definition, \[f(t,b)_k = \begin{cases}
+% \in \T\). If \(v = \bot\), we have, by definition, \[f(t,b)_k =
+% \begin{cases}
 %       0, &\text{if \(k = s\)} \\
 %       b_k, &\text{otherwise}
 %   \end{cases}\] and \[g(t,b) = \bigwedge_{\substack{t' \in \T_c
@@ -1574,10 +1286,12 @@ The next lemma relies on a preorder structure on the set of balance proofs.
 %       &= f(t,b)_k.
 %   \end{align*} We have now shown \(g((s,r,\bot),b) \leq
 % f((s,r,\bot),b)\). To show the other inequality, we observe that
-% \(f_c((s,r,v),b) \geq f((s,r,\bot),b)\). It then follows that \begin{align*}
+% \(f_c((s,r,v),b) \geq f((s,r,\bot),b)\). It then follows that
+% \begin{align*}
 %       g(t,b) &= \bigwedge_{\substack{v \in \V_+ \\ b \leq b'}}
 % f_c((s,r,v),b') \\
-%       &\geq \bigwedge_{\substack{v \in \V_+ \\ b \leq b'}} f((s,r,\bot),b') \\
+%       &\geq \bigwedge_{\substack{v \in \V_+ \\ b \leq b'}}
+% f((s,r,\bot),b') \\
 %       &= \bigwedge_{b \leq b'} f((s,r,\bot),b') \\
 %       &= \begin{cases}
 %           \wedge_{b \leq b'} 0, &\text{if \(k = s\)} \\
@@ -1619,7 +1333,8 @@ The next lemma relies on a preorder structure on the set of balance proofs.
 
 % \begin{prop}\label{thm:balance-proof-is-binding}
 %   For all PPT algorithms that outputs two valid balance proofs, we
-% have that the join of the balance proofs exists with overwhelming probability.
+% have that the join of the balance proofs exists with overwhelming
+% probability.
 % \end{prop}
 
 % \begin{proof}
