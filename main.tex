@@ -76,12 +76,20 @@
 \newcommand{\B}{\mathcal{B}}
 \newcommand{\C}{\mathcal{C}}
 \newcommand{\R}{\mathcal{R}}
+\newcommand{\I}{\mathcal{I}}
+\renewcommand{\O}{\mathcal{O}}
 
 \newcommand{\up}{\mathord{\uparrow}}
 \newcommand{\down}{\mathord{\downarrow}}
 
 \renewcommand{\u}{\mathfrak{u}}
 \renewcommand{\l}{\mathfrak{l}}
+
+\newcommand{\mly}[2]{Mly(#1, #2)}
+
+\newcommand{\trans}[1]{#1_{\text{trans}}}
+\newcommand{\out}[1]{#1_{\text{out}}}
+\newcommand{\ms}[1]{#1_{\S}}
 
 % TODO: I borrowed this picture from LaTeX SE.
 % https://tex.stackexchange.com/a/294990
@@ -796,7 +804,7 @@ FVIntmax/Balance.lean#L61}{\ExternalLink}
 
 for extracting a list of partial transactions from a balance proof
 and a transfer block as follows. Given a balance proof \(\pi \in
-\Pi\) and a transfer block \((aggregator,extradata,C,S,\sigma) \in
+\Pi\) and a transfer block \((C,S) \in
 B_{transfer}\), we take, for each sender \(s \in
 \K_2\) in order, the
 partial transaction \(v \in \T\) where
@@ -843,18 +851,11 @@ block and concatenate the lists of partial transactions
 
 \subsection{Step 2: Computing balances from a list of partial transactions}
 
-The second step in computing balances is to apply a \emph{transition
-function} to the list of partial transactions obtained in step 1,
-starting from the state where all account balances are zero.
-
-\begin{defn}
-  \href{https://github.com/\repo
-  FVIntmax/Balance.lean#L628}{\ExternalLink} A \emph{transition
-  function}\footnote{Sometimes called a semiautomation in the
-  literature.} is a function on the form \(f : \T \times \S \to \S\),
-  where \(\T\) is called the set of transactions and \(\S\) is called
-  the set of states.
-\end{defn}
+The second step in computing balances is to define a \emph{Mealy
+machine} from \(\T\) to \(\T\), whose state is the account balances,
+and whose transition function takes a transaction and the
+current account balances, and outputs the updated account balances as
+well as an adjusted transaction.
 
 In our case, a state is an assignment of a balance to each account,
 where every non-source account has a positive balance
@@ -864,7 +865,7 @@ FVIntmax/State.lean#L31}{\ExternalLink}: \[\S := \{b \in
 \overline{K}\backslash \{\source\}\},\] and the set of transactions
 is the set \(\T\) of partial transactions defined in Step 1 above. In
 order to define the transition function \(f\), we will first define a
-different transition function \(f_c : \T_c \times \S \to \S\), where
+different transition function \(f_c : \T_c \times \S \to \S \times \T_c\), where
 the set of transactions is the subset \(\T_c \subseteq \T\), called
 the \emph{complete transactions}, consisting of the transactions
 \(v \in \T\) where \(v_k \neq \bot \, \forall k \in \overline{\K}\),
@@ -877,8 +878,8 @@ For all complete transactions \(v \in
 \begin{align*}
   f_c(v,b) & :=
   \begin{cases}
-    b + v, & \text{ if \(b + v \in \S\)} \\
-    b,            & \text{otherwise}.
+    (b + v, v), & \text{ if \(b + v \in \S\)} \\
+    (b, 0),            & \text{otherwise}.
   \end{cases}
 \end{align*}
 
@@ -894,21 +895,16 @@ on \(T = Maybe(\V)\), of which \(\S\) is a subset. We then give
 
 \begin{defn}\label{defn:transition-function}
   A \emph{transition function for partial transactions} is a monotone function
-  \[f : \T \times \S \to \S\] such that
+  \[f : \T \times \S \to \S \times \T\] such that
   \[f(t,b) \leq f_c(t',b')\] for all \((t',b') \in \T_c \times \S\)
   where \((t,b) \leq (t',b')\).
 \end{defn}
 
 In the remainder of the protocol descripiton, let \[f : \T \times \S
-\to \S\] be a transition function for partial transactions (called
-just the \emph{transition function}). The
-transition function \(f: \T \times \S \to \S\) induces the
-function \(f^* : \T^* \times \S \to \S\) which takes a list of
-transactions \(T_* \in \T^*\) and an initial state \(s_0 \in \S\) and
-returns the state obtained by applying the transition function \(f\),
-in order, to every transaction in \(T_*\), starting with the initial
-state \(s_0\) \href{https://github.com/\repo
-FVIntmax/Balance.lean#L660}{\ExternalLink}. In our case, given the
+\to \S \times \T\] be a transition function for partial transactions. The
+Mealy machine \(f: \T \times \S \to \S \times \T\) induces the
+Mealy machine \(f^* : \T^* \times \S \to \S \times \T^*\). In our
+case, given the
 list of partial transactions \(T_*\) obtained in Step 1, we compute
 the balances as \(f^*(T_*,0)\), where \(0 \in \S\) is the initial
 state where every account has a zero balance
@@ -919,7 +915,7 @@ FVIntmax/Balance.lean#L675}{\ExternalLink}:
 
 \[
   \begin{aligned}[t]
-    \mathsf{Bal} \colon \Pi \times B^* & \to \S
+    \mathsf{Bal} \colon \Pi \times B^* & \to \S \times \T^*
     \\
     (\pi, B_*)                         & \mapsto
     f^*(\mathsf{TransactionsInBlocks}(\pi,B_*),0).
@@ -928,194 +924,49 @@ FVIntmax/Balance.lean#L675}{\ExternalLink}:
 \newpage
 \section{Security}\label{section:security}
 
-In this section we define and prove the security of the rollup
-contract. Informally speaking, we say that the rollup contract is
-secure if every withdrawal request succeeds, i.e. the rollup contract
-has sufficient balance for every withdrawal. This means that if a
-user has a balance proof which proves the in-rollup balance of one or
-more of their L1 accounts, they will be able to withdraw these
-balances to L1.
-
 \subsection{Formal description of the rollup contract}
 
-We formally define the rollup contract.
+In this section we formally define the rollup contract as a Mealy machine.
 
 \begin{defn}
-  \href{https://github.com/\repo
-  FVIntmax/Block.lean#L115}{\ExternalLink}The rollup contract state
+  The rollup contract state
   consists of the list of blocks that have been added to the rollup.
-  Formally, we define the set of contract states as
   \[\S_{contract} := \B^*.\]
 \end{defn}
 
 \begin{defn}
-  \href{https://github.com/\repo
-  FVIntmax/Request.lean#L50}{\ExternalLink}We define the set of
-  rollup requests as \[\R := \R_{deposit} \amalg \R_{transfer} \amalg
-  \R_{withdrawal},\] where
-  \begin{align*}
-    \R_{deposit}   & := \B_{deposit}  \\
-    \R_{transfer}  & := \B_{transfer} \\
-    \R_{withrawal} & := \Pi.
-  \end{align*}
+  We define the set of contract transactions as
+  \[\T_{contract} := \B \times \Pi.\]
 \end{defn}
 
 \begin{defn}
-  \href{https://github.com/\repo
-  FVIntmax/Request.lean#L145}{\ExternalLink}      \[
-    \begin{aligned}[t]
-      \mathsf{ToBlock}_{deposit} \colon \R_{deposit} & \to \B_{deposit} \\
-      B                                              & \mapsto B.
-  \end{aligned}\]
-\end{defn}
-
-\begin{defn}
-  \href{https://github.com/\repo
-  FVIntmax/Request.lean#L147}{\ExternalLink}      \[
-    \begin{aligned}[t]
-      \mathsf{ToBlock}_{transfer} \colon \R_{transfer} & \to
-      \B_{transfer} \\
-      B                                                & \mapsto B
-  \end{aligned}\]
-\end{defn}
-
-\begin{defn}
-  \href{https://github.com/\repo
-  FVIntmax/Request.lean#L149}{\ExternalLink}      \[
-    \begin{aligned}[t]
-      \mathsf{ToBlock}_{withdrawal} \colon \R_{withdrawal} \times
-      \B^* & \to \B_{withdrawal} \\
-      (\pi, B_*)
-      & \mapsto
-      \mathsf{Bal}(\pi,B_*)\vline_{K_1}
-  \end{aligned}\]
-\end{defn}
-
-\begin{defn}
-  \href{https://github.com/\repo
-  FVIntmax/Request.lean#L139}{\ExternalLink}      \[
-    \begin{aligned}[t]
-      \mathsf{ToBlock} \colon \R \times \B^* & \to \B
-      \\
-      (R, B_*)                               & \mapsto
-      \begin{cases}
-        \mathsf{ToBlock}_{deposit}(R),        & \text{ if \(R \in
-        \R_{deposit}\)}    \\
-        \mathsf{ToBlock}_{transfer}(R),       & \text{ if \(R \in
-        \R_{transfer}\)}   \\
-        \mathsf{ToBlock}_{withdrawal}(R,B_*), & \text{ if \(R \in
-        \R_{withdrawal}\)} \\
-      \end{cases}
-  \end{aligned}\]
-\end{defn}
-
-\begin{defn}
-  A rollup contract transaction consists of a rollup request and a
-  transaction sender. Formally, we define the set of rollup contract
-  transactions as \[\T_{contract} := \R \times \K_1.\]
-\end{defn}
-
-\begin{defn}\href{https://github.com/\repo
-  FVIntmax/Request.lean#L65}{\ExternalLink}
   \[
     \begin{aligned}[t]
-      \mathsf{IsValid}_{\T_{contract}} \colon \T_{contract} & \to
-      \{True, False\}
+      f_{contract} \colon \T_{contract} \times \S_{contract} \to
+      &\, \S_{contract} \times \T^*
       \\
-      (R, s)                                                & \mapsto
-      \begin{cases}
-        True,                 & \text{ if \(R \in \R_{deposit}\)}
-        \\
-        \mathsf{SA.Verify}(S,(C,agg,e),\sigma)
-        \\ \wedge \, s = agg, &\text{ if \(R = (agg, e, C, S, \sigma)
-        \in \R_{transfer}\)} \\
-        \mathsf{Verify}(\pi), & \text{ if \(R = \pi \in
-        \R_{withdrawal}\)} \\
-      \end{cases}
+      ((B,\pi), B_*)
+      \mapsto &\, (B_* || B, T_*) \\
+      &\, \text{where} \\
+      & \quad T'_* = \mathsf{TransactionsInBlock}(\pi, B) \\
+      & \quad (b,\_) = \mathsf{Bal}(\pi,B_*) \\
+      & \quad (\_,T_*) = f^*(T'_*,b)
     \end{aligned}
   \]
 \end{defn}
 
-\begin{defn}
-  \href{https://github.com/\repo
-  FVIntmax/AttackGame.lean#L122}{\ExternalLink}      \[
-    \begin{aligned}[t]
-      f_{contract} \colon \T_{contract} \times \S_{contract} & \to
-      \S_{contract}
-      \\
-      ((R,s), B_*)                                           & \mapsto
-      \begin{cases}
-        (B_* || \mathsf{ToBlock}(R,B_*)), & \text{if
-        \(\mathsf{IsValid}_{\T_{contract}}(R,s)\)} \\
-        B_*,                              & \text{otherwise.}
-      \end{cases}
-  \end{aligned}\]
-\end{defn}
-
-The balance of the rollup contract is not part of the contract state,
-but is computed from the blocks in the rollup as follows. The
-contract balance is defined to be initially zero, and then
-subsequently updated each time a new rollup block is added, using the
-following update function.
+To compute the balance of the rollup contract, we compose
+\(f_{contract}\) with the Mealy machine associated to the partial
+ordered monoid \(\T\).
 
 \begin{defn}
-  \href{https://github.com/\repo
-  FVIntmax/AttackGame.lean#L49C1-L55C73}{\ExternalLink}
   \[
     \begin{aligned}[t]
-      updateBalance \colon \B \times \V & \to \V
-      \\
-      (B,v)                             & \mapsto
-      \begin{cases}
-        v + d,                     & \text{if \( B = (recipient,d)
-        \in \B_{deposit}\)} \\
-        v,                         & \text{if \(B \in
-        \B_{transfer}\)}                 \\
-        v - \sum_{k \in \K_1} w_k, & \text{if \(B = w \in \B_{withdrawal}\)}
-      \end{cases}
-  \end{aligned}\]
-\end{defn}
-
-\subsection{Security definition}
-
-We formally define the security of the rollup contract with the
-following attack game.
-
-\begin{game}\label{game:secure}
-  \href{https://github.com/\repo
-  FVIntmax/AttackGame.lean#L207}{\ExternalLink}The attack game is
-  played between a PPT adversary and a challenger, where the
-  challenger plays the role of the rollup contract. First, the
-  challenger initializes the rollup contract with the state \(((), 0)
-  \in \S_{contract}\). Then, the adversary sends a sequence of
-  contract transactions (elements of \(\T_{contract}\)) to the
-  challenger. For each contract transaction, the challenger updates
-  the rollup contract state using the transition function
-  \(f_{contract}\). The adversary wins the attack game if at the end
-  of the interaction, the rollup contract has a state
-  \((B_*,balance)\) where \[balance \ngeq 0.\]
-\end{game}
-
-% \subsection{Rollup contract balance}
-
-% The balance of the rollup contract is equal to the total amount
-% deposited into the rollup contract minus the total amount withdrawn
-% from the rollup contract. This can be computed from the contract
-% state as follows:
-
-%    \[
-%  \begin{aligned}[t]
-%    \mathsf{ContractBalance} \colon B_* & \to \V_+ \\
-%                  (B_i)_{i \in [n]} & \mapsto \sum_{\substack{i \in
-% [n] \\ B_i \in \B_{deposit} \\ B_i = (r,v)}} v - \sum_{\substack{i
-% \in [n] \\ B_i \in \B_{withdrawal} \\ k \in \K_1}} B_i(k).
-%  \end{aligned}\]
-
-\begin{defn}\label{defn:secure}
-  The rollup contract is \emph{secure} if winning \Cref{game:secure}
-  is at least as hard as breaking either the binding property of the
-  authenticated dictionary scheme, or finding a collision of the hash
-  function \(\mathsf{H}\).
+      f_{contractBalance} \colon \T_{contract} \times (\S_{contract}
+      \times \T) \to
+      &\, (\S_{contract} \times \T) \times \T
+    \end{aligned}
+  \]
 \end{defn}
 
 \subsection{Security proof}
@@ -1175,7 +1026,7 @@ The next lemma relies on a preorder structure on the set of balance proofs.
     Dict(\mathsf{AD}.\C \times \K_2, (\mathsf{AD}.\Pi \times \{0,1\}^*)
   \times \T)\] a preorder as follows. First, we give
   \(\mathsf{AD}.\Pi \times \{0,1\}^*\) the trivial preorder. Then, we give
-  \((\mathsf{AD}.\Pi \times \{0,1\}^*) \times \V_+^{\K}\) the induced
+  \((\mathsf{AD}.\Pi \times \{0,1\}^*) \times \T\) the induced
   product preorder, and \(\Pi\) the induced
   dictionary preorder.
 \end{defn}
@@ -1212,210 +1063,15 @@ The next lemma relies on a preorder structure on the set of balance proofs.
   \B_{deposit} \\ B_i = (r,v)}} v\]
 \end{lemma}
 
-%ERIK: I see you have some kind of a sketch, I'll just point out
-% lemma5, f_withdrawal_block_source and f_transfer_block_source are
-% all their separate inductions (lemma5 for the overall structure,
-% and the other two induce over all transactions extracted from blocks).
-
-% By definition, we have \(\mathsf{Bal}(\pi,B_*) = f^*(t_*,0)\) where
-% \(t_* = \mathsf{TransactionsInBlocks}(\pi,B_*)\), so the lemma
-% follows from the more general fact that \[f^*(t_*,0)_\source \leq 0
-% \quad \forall t_* \in T^*.\] In order to prove this, we will first
-% prove that for all \(t_* \in T^*\), letting \(b = f^*(t_*,0)\) we
-% have \begin{equation}\label{eqn:balance-sum-is-negative}
-%     \sum_{k \in \overline{\K}} b_k \leq 0
-%     \end{equation}
-%     and
-% \begin{equation}\label{eqn:non-source-accounts-have-positive-balances}
-%         b_k \geq 0, \quad \forall k \in \overline{\K} \backslash
-% \{\source\}.
-%     \end{equation}
-% We prove these facts by induction on the length of \(t_*\). In the
-% base case, where \(t_* = ()\) is the empty list, we have \(b =
-% f^*(t_*,0) = 0\), so both statements are clearly true in this case.
-% For the induction step, suppose the statements hold for all lists
-% \((t_i)_{i \in [n]} \in \T^*\) of length \(n\). Let \(t_* =
-% (t_i)_{i \in [n+1]}\) be a list of length \(n+1\), let \(b =
-% f^*((t_i)_{i \in [n]},0)\) and let \(b' = f^*((t_i)_{i \in
-% [n+1]},0)\). By the induction hypothesis, we have \(\sum_{k \in
-% \overline{\K}} b_k \leq 0\) and \(b_k \geq 0, \quad \forall k \in
-% \overline{\K} \backslash \{\source\}\). By definition, we have \(b'
-% = f(t,b)\), where \(t = t_{n+1}\). We first show that
-% \Cref{eqn:balance-sum-is-negative} holds for \(b'\).
-
-% We then get
-% \begin{align*}
-%     f^*(t_*,0)_\source &= \sum_{k \in \overline{\K}} f^*(t_*,0)_k -
-% \sum_{k \in \overline{\K} \backslash \{\source\}} f^*(t_*,0)_k \\
-%     &\leq - \sum_{k \in \overline{\K} \backslash \{\source\}}
-% f^*(t_*,0)_k \\
-%     &\leq 0
-% \end{align*}
-%\end{proof}
-
-% \subsection{Alternative formulation of the balance function}
-
-% \begin{prop}\label{thm:estimate-is-correct}
-%   We have \[f(t,b) = \bigwedge_{\substack{t' \in \T_c \\ t \leq_p
-% t' \\ b \leq b'}} f_c(t',b').\]
-% \end{prop}
-
-% \begin{proof}
-%   Let \[g(t,b) = \bigwedge_{\substack{t' \in \T_c \\ t \leq_p t'
-% \\ b \leq b'}} f_c(t',b').\] We need to show that \(f(t,b) =
-% g(t,b)\) for all \(t \in \T\) and \(b \in \S\). Let \(t = (s,r,v)
-% \in \T\). If \(v = \bot\), we have, by definition, \[f(t,b)_k =
-% \begin{cases}
-%       0, &\text{if \(k = s\)} \\
-%       b_k, &\text{otherwise}
-%   \end{cases}\] and \[g(t,b) = \bigwedge_{\substack{t' \in \T_c
-% \\ t \leq_p t' \\ b \leq b'}} f_c(t',b') = \bigwedge_{\substack{v
-% \in \V_+ \\ b \leq b'}} f_c((s,r,v),b').\] If \(s \neq Source\), we
-% have \begin{align*}
-%       g(t,b)_s &= \bigwedge_{\substack{v \in \V_+ \\ b \leq b'}}
-% f_c((s,r,v),b')_s \\
-%       &\leq f_c((s,r,b_s),b)_s \\
-%       &= 0 \\
-%       &= f(t,b)_s
-%   \end{align*} and for all \(k \in \K \backslash \{Source, s\}\) we
-% have \begin{align*}
-%       g(t,b)_k &= \bigwedge_{\substack{v \in \V_+ \\ b \leq b'}}
-% f_c((s,r,v),b')_k \\
-%       &\leq f_c((s,r,b_s),b)_k \\
-%       &= b_k \\
-%       &= f(t,b)_k.
-%   \end{align*} We have now shown \(g((s,r,\bot),b) \leq
-% f((s,r,\bot),b)\). To show the other inequality, we observe that
-% \(f_c((s,r,v),b) \geq f((s,r,\bot),b)\). It then follows that
-% \begin{align*}
-%       g(t,b) &= \bigwedge_{\substack{v \in \V_+ \\ b \leq b'}}
-% f_c((s,r,v),b') \\
-%       &\geq \bigwedge_{\substack{v \in \V_+ \\ b \leq b'}}
-% f((s,r,\bot),b') \\
-%       &= \bigwedge_{b \leq b'} f((s,r,\bot),b') \\
-%       &= \begin{cases}
-%           \wedge_{b \leq b'} 0, &\text{if \(k = s\)} \\
-%           \wedge_{b \leq b'} b'_k, &\text{otherwise}
-%       \end{cases} \\
-%       &= \begin{cases}
-%           0, &\text{if \(k = s\)} \\
-%           b_k, &\text{otherwise}
-%       \end{cases} \\
-%       &= f(t,b)
-%   \end{align*}
-%   We have now shown that \(f((s,r,\bot),b) = g((s,r,\bot),b)\). It
-% remains to show \(f((s,r,v),b) = g((s,r,v),b)\). If \(v \neq
-% \bot\), we have \begin{align*}
-%   f((s,r,v),b)_k &:=
-%   \begin{aligned}[t]
-%     &\begin{cases}
-%   b_s - (v \vee b_s), &\text{ if } k = s \\
-%   b_r + v', &\text{ if } k = r \\
-%   b_k,      &\text{ otherwise,}
-% \end{cases} \\
-% &\text{where } v' :=
-% \begin{cases}
-%   v, &\text{ if \(v \leq b_s\) or \(s = Source\)} \\
-%   0, &\text{ otherwise}
-% \end{cases}
-% \end{aligned}
-% \end{align*}
-% and \[g(t,b) = \bigwedge_{\substack{t' \in \T_c \\ t \leq_p t' \\ b
-% \leq b'}} f_c(t',b') = \bigwedge_{b \leq b'} f_c((s,r,v),b').\]
-% \end{proof}
-
-% \subsubsection{Preorder structures in our design}
-
-% \begin{prop}\label{thm:getpartialledger-is-monotone}
-%   We have that \(\mathsf{TransactionsInBlocks}(-,B_*)\) is monotone
-% for all \(B_* \in \B^*\).
-% \end{prop}
-
-% \begin{prop}\label{thm:balance-proof-is-binding}
-%   For all PPT algorithms that outputs two valid balance proofs, we
-% have that the join of the balance proofs exists with overwhelming
-% probability.
-% \end{prop}
-
-% \begin{proof}
-%   Suppose an algorithm outputs two valid balance proofs \((K,D),
-% (K',D') \in \Pi\) such that the join of the two balance proofs does
-% not exist. Then, we have that there is at least one key \(k \in K
-% \cap K'\) such that \(D(k) = (\pi,t)\) and \(D'(k) = (\pi',t')\)
-% and where \(t \neq t'\). This means that we have broken the binding
-% property of the authenticated dictionary scheme, which can only
-% happen with negligible probability.
-% \end{proof}
-
-% \begin{prop}\label{thm:sum-of-balances-is-less-than-sum-of-deposits}
-%   Let \(B_* = (B_i)_{i \in [n]}\) be a list of blocks and let \(\pi
-% \in \Pi\) be a valid balance proof. Then we have \[\sum_{k \in \K
-% \backslash \{Source\}} Bal(\pi,B_*)_k \leq \sum_{\substack{i \in
-% [n] \\ B_i = (r,v)}} v.\] In other words, the total balance of all
-% accounts computed from a balance proof and block list must be less
-% than or equal to the total amount deposited in the deposit blocks.
-% \end{prop}
-
-% \begin{proof}
-%   By inspection, we have \[\sum_{k \in \K \backslash \{Source\}}
-% (f((s,r,v),b) - b)_k =
-%   \begin{cases}
-%       v, &\text{if \(s = Source\) and \(v \neq \bot\)} \\
-%       -b_s, &\text{if \(s \neq Source\) and \(v \nleq b_s\)} \\
-%       0, &\text{otherwise.}
-%   \end{cases}
-%   \]
-%   It follows that we get the inequality \[\sum_{k \in \K \backslash
-% \{Source\}} (f((s,r,v),b) - b)_k \leq
-%   \begin{cases}
-%       v, &\text{if \(s = Source\) and \(v \neq \bot\)} \\
-%       0, &\text{otherwise.}
-%   \end{cases}
-%   \] Let \((t_i)_{i \in [m]} = \mathsf{TransactionsInBlocks}(\pi,
-% B_*)\). We then get
-%   \begin{align*}
-%        \sum_{k \in \K \backslash \{Source\}} Bal(\pi)_k
-%     &= \sum_{k \in \K \backslash \{Source\}} f^*(t_*,0)_k \\
-%     &= \sum_{\substack{i \in [m] \\ k \in \K \backslash
-% \{Source\}}} (f(t_i,b_i) - b_i)_k \\
-%     &\leq \sum_{\substack{i \in [m] \\ t_i = (Source, r, v) \\ v
-% \neq \bot}} v \\
-%     &= \sum_{\substack{i \in [n] \\ B_i = (r,v)}} v.
-%   \end{align*}
-% \end{proof}
-
 \begin{thm}\label{thm:rollup-contract-is-secure}
-  \href{https://github.com/\repo
-  FVIntmax/Theorem1.lean#L691}{\ExternalLink}The rollup contract is
-  secure (by \Cref{defn:secure}).
+  Let \(T_* = (B_i,\pi_i)_{i \in [n]}\) be a list of contract
+  transactions. Then, either the resulting contract balance is
+  positive, or the balance proofs \(\pi_*\) do not have a join in \(\Pi\).
 \end{thm}
 
 \begin{proof}
-  Suppose an adversary and a challenger have interacted in
-  \Cref{game:secure}. We will show that either the resulting contract
-  balance is positive (the adversary lost the game), or the adversary
-  has been able to either break the binding property of the
-  authenticated dictionary scheme or found a collision of the hash
-  function \(\mathsf{H}\). Let \(B_* = (B_i)_{i \in [n]}\) be the
-  contract state after the attack game \href{https://github.com/\repo
-  FVIntmax/Theorem1.lean#L708}{\ExternalLink}, let \(I \subseteq
-  [n]\) be the indices of the withdrawal blocks in \(B_*\)
-  \href{https://github.com/\repo
-  FVIntmax/Theorem1.lean#L729}{\ExternalLink}and let \((\pi_i)_{i \in
-  I}\) be the balance proofs used in the withdrawal requests
-  \href{https://github.com/\repo
-  FVIntmax/Theorem1.lean#L747}{\ExternalLink}. The resulting contract
-  balance can be computed by adding all deposited amounts and
-  subtracting all withdrawn amounts \href{https://github.com/\repo
-  FVIntmax/Theorem1.lean#L758}{\ExternalLink}: \[contractBalance =
-  v_{deposited} - v_{withdrawn},\] where \[v_{deposited} =
-    \sum_{\substack{i \in [n] \\ B_i \in \B_{deposit} \\ B_i = (r,v)}}
-  v\] and \[v_{withdrawn} = \sum_{\substack{i \in I \\ k \in \K_1}}
-  \mathsf{Bal}(\pi_i,(B_j)_{j \in [i-1]})_k.\] We now have two
-  possibilities, either the balance proofs \((\pi_i)_{i \in I}\) have
-  a join in \(\Pi\) or they don't \href{https://github.com/\repo
-  FVIntmax/Theorem1.lean#L762}{\ExternalLink}. Suppose they have a
-  join \(\pi \in \Pi\). Then we have
+  Suppose the balance proofs \((\pi_i)_{i \in I}\) have
+  a join \(\pi \in \Pi\). Then we have
   \begin{align*}
     0 & \leq - \mathsf{Bal}(\pi,B_*)_\source      &  &
     \text{(\cref{thm:source-balance-is-negative})} \\
@@ -1429,97 +1085,264 @@ The next lemma relies on a preorder structure on the set of balance proofs.
     \pi\) )} \\
     & = contractBalance
   \end{align*} which shows that the contract balance is positive
-  \href{https://github.com/\repo
-  FVIntmax/Theorem1.lean#L621}{\ExternalLink}. Now, suppose the
-  balance proofs \((\pi_i)_{i \in I}\) do not have a join in \(\Pi\).
-  Let \(i_k\) be the \(k'th\) index in \(I\) (so that \(I =
-  \{i_1,i_2,\dots,i_{m}\}\), where \(m = |I|\)). Then, let
-  \((\pi'_k)_{k \in [m]}\) be the balance proofs defined recursively
-  as \[ \pi_k =
-    \begin{cases}
-      \bot,                                 & \text{if \(k = 0\)}     \\
-      \mathsf{Merge}(\pi'_{k-1},\pi_{i_k}), & \text{if \(k \geq 1\).}
-  \end{cases}\] \href{https://github.com/\repo
-  FVIntmax/Theorem1.lean#L55}{\ExternalLink}\href{https://github.com/\repo
-  FVIntmax/Theorem1.lean#L791}{\ExternalLink}.
-  %(ERIK: Off by one for no withdrawals. One can define the recursion
-  % scheme for the zeroth index to be the balance proof that is
-  % $\bot$ for all keys, the rest follows.)
-  Clearly, these merged balance proofs are valid, since each of the
-  original balance proofs are valid (otherwise they wouldn't be
-  accepted by the rollup contract), and since the merge of two valid
-  balance proofs is again valid. Now, we argue that there must be an
-  index \(k \in \{1,\dots,m\}\) such that \(\pi'_k\) is \emph{not}
-  the join of \(\pi'_{k-1}\) and \(\pi_{i_k}\) in \(\Pi\), since if
-  not, the final merged balance proof \(\pi'_m\) would be a join of
-  \((\pi_i)_{i \in I}\) (by \Cref{thm:join-condition}), which we have
-  assumed not to exist \href{https://github.com/\repo
-  FVIntmax/Theorem1.lean#L823}{\ExternalLink}.
-
-  %(ERIK: The proof that the generalised merge behaves in this manner
-  % is not trivial, especially because the intermediate ones need not
-  % exist unless specific conditions are met. Proof sketch: Let
-  % 'compatibility' be the condition from the proposition 6 (notation
-  % $<\cong >$). First show that merge of two compatible least upper
-  % bounds is the least upper bound of the union of the original
-  % sets. This is lemma
-  % \verb|isLUB_union_Merge_of_isLUB_isLUB_compat|. Now one can show
-  % by induction that if we are given a sequence of
-  % pairwise-compatible balance proofs, then the recursive merge
-  % procedure is their least upper bound; this is
-  % \verb|prop6_general_aux|. To show that there is an index which
-  % 'breaks' the recursive merge, we reason by contradiction. So
-  % suppose instead that for any index, one can obtain the
-  % appropriate supremum. The rest of the argument is what you give
-  % in the paper, except we need to show that assuming we have these
-  % suprema, one can in fact conclude that merging all of these gives
-  % us a supremum - this is lemma \verb|prop6_general|. To show this,
-  % it suffices to show that these balance proofs are in fact
-  % pairwise compatible, by lemma \verb|prop6_general_aux|. The set
-  % $\{n | \exists i, i < |\pi s| \wedge n < i \wedge \neg (\pi s[n]
-  % <\cong > \pi s[i] )\}$ is not empty, so we grab its minimal
-  % element, call it $idx$. Then pick the minimal element greater
-  % than $idx$ that is not compatible with the balance proof indexed
-  % at $idx$. Call it $idx'$ (similar set to the above, still not
-  % empty). NB I will use $idx$ and the balance proof associated with
-  % $idx$ interchangeably. Now, we can show that there exists a key
-  % $k$ that is in both $idx$ and $idx'$ and for which $idx_k$ is
-  % isomorphic with $idx'_k$. Then, one can show by induction that
-  % the element at $k$ in the balance proof obtained by merging the
-  % first $idx + 1$ balance proofs is isomorphic with $idx_k$, and
-  % further isomorphic with querying $k$ in the balance proof
-  % obtained by merging the first $idx'$ balance proofs. However, it
-  % then follows that merging the first $idx'$ balance proofs is not
-  % compatible with $idx'$, and proposition 6 gives us that there
-  % does not exist a supremum for these two, yet we had assumed it
-  % does. Lean has many more steps explicitly articulated
-  % ($eq_1,\ eq_2, ...$) in what I believe is a readable manner, so
-  % it has a lot more detail for this proof.)
-  It then follows from \Cref{thm:join-condition} that there is a key
-  \((C,s) \in \mathsf{AD}.\C \times \K_2\) such that
-  \(\pi'_{k-1}(C,s) \not\simeq
-  \pi_{i_k}(C,s)\)\href{https://github.com/\repo
-  FVIntmax/Theorem1.lean#L843}{\ExternalLink}. Letting
-  \(((\pi,salt),t) = \pi'_{k-1}(C,s)\) and \(((\pi',salt'),t') =
-  \pi_{i_k}(C,s)\), this implies \(t \neq
-  t'\)\href{https://github.com/\repo
-  FVIntmax/Theorem1.lean#L874}{\ExternalLink}. Also, since both
-  balance proofs are valid, as remarked earlier, we have
-  \href{https://github.com/\repo
-  FVIntmax/Theorem1.lean#L863}{\ExternalLink}
-  \[\mathsf{AD.Verify}(\pi,s,\mathsf{H}(t,salt),C)\] and
-  \href{https://github.com/\repo
-  FVIntmax/Theorem1.lean#L869}{\ExternalLink}
-  \[\mathsf{AD.Verify}(\pi',s,\mathsf{H}(t',salt'),C).\] It follows
-  that that either \(\mathsf{H}(t,salt) = \mathsf{H}(t',salt')\),
-  meaning that we have found a hash collision
-  \href{https://github.com/\repo
-  FVIntmax/Theorem1.lean#L882}{\ExternalLink}, or
-  \(\mathsf{H}(t,salt) \neq \mathsf{H}(t',salt')\), which means we
-  have broken the binding property of the authenticated dictionary
-  scheme \href{https://github.com/\repo
-  FVIntmax/Theorem1.lean#L895}{\ExternalLink}.
 \end{proof}
+
+\newpage
+
+\section{Preliminaries}
+
+Everything in this section is well-known.
+
+\subsection{Mealy machines}
+
+A Mealy machine is a kind of automata that we use both in our
+definition of the balance function, as well as in the definition of
+the rollup contract. In general, a Mealy machine can be defined in
+any monoidal category. In our case, we will use the category of
+prosets and monotone maps, with cartesian products as the
+monoidal structure.
+
+\begin{defn}
+  Let \(A\) and \(B\) be prosets. A \emph{Mealy machine} from
+  \(A\) to \(B\) consists of a proset \(\S\), and monotone
+  maps \[\S \xleftarrow{\text{trans}} A \times \S
+  \xrightarrow{\text{out}} B.\] We write \(\mly{A}{B}\) for the set
+  of Mealy machines from \(A\) to \(B\).
+\end{defn}
+
+\begin{defnprop}
+  Let \(m \in \mly{A}{B}\) be a Mealy machine. We then define a
+  Mealy machine \(m^* \in \mly{A^*}{B^*}\), where \(\ms{m^*} =
+  \ms{m}\) and where
+  \[
+    \begin{aligned}[t]
+      \trans{m^*}(as, s)
+      & :=
+      \begin{cases}
+
+        s,      & \text{if \(as = ()\)}    \\
+        \trans{m}\left(a, \trans{m^*}(as', s)\right) &
+        \text{if \(as = a : as'\)}
+      \end{cases}
+  \end{aligned}\]
+  and
+  \[
+    \begin{aligned}[t]
+      \out{m^*}(as, s)
+      & :=
+      \begin{cases}
+
+        (),      & \text{if \(as = ()\)}    \\
+        \out{m}(a,\trans{m^*}(as',s)) : \out{m^*}(as',s) & \text{if
+        \(as = a : as'\)}.
+      \end{cases}
+  \end{aligned}\]
+\end{defnprop}
+
+\begin{proof}
+  We need to show that the maps \(\trans{m^*}\) and \(\out{m^*}\)
+  are monotone.
+\end{proof}
+
+%  \begin{defn}
+%    Let \(M\) be a partially ordered monoid. The \emph{Mealy machine
+%    associated to \(M\)} is the Mealy machine \((M,f)\), where
+%    \[
+%      \begin{aligned}[t]
+%        f \colon M \times M & \to M \times M \\
+%        (x,y)                                                      &
+%        \mapsto
+%        (x+y,x+y)
+%      \end{aligned}
+%    \]
+%  \end{defn}
+
+\section{Protocol description}
+
+Let \(\Pi\), \(\B\), \(\O\) be prosets. Let
+
+\[m \in \mly{\Pi \times \B}{\O}\]
+
+be a Mealy machine. Let \(s_0 \in \ms{m}\). Let
+
+\[c \in \mly{\Pi \times \B}{\O}\]
+
+be the Mealy machine where \(\ms{c} := \B^*\),
+
+\[ \trans{c}\left((-,b),bs\right) := b : bs \]
+
+and
+
+\[
+  \out{c}\left((\pi,b),bs\right) := \out{m}\left((\pi,b),
+  \trans{m^*}(((\pi,b') \, | \, \forall b' \in bs), s_0)\right).
+\]
+
+\begin{prop}
+  For all \(ts \in (\Pi \times \B)^*\), we have
+  \[\trans{c}^*(ts, ()) = (b \, | \, \forall (-,b) \in ts).\]
+\end{prop}
+
+\begin{prop}\label{thm:same-balance-proofs}
+  Let \(\pi \in \Pi\) and let \(bs \in \B^*\). Then we
+  have \[\out{c^*}\left(ts, ()\right) =
+  \out{m^*}(ts, s_0),\] where \(ts = ((\pi,b) \, | \, \forall b \in bs)\).
+\end{prop}
+
+\begin{proof}
+  We prove by induction on the list \(bs\). Let \(bs = ()\). Then we have
+  \(\out{c}^*\left((), ()\right) = \out{m}^*\left((), s_0\right) = ()\),
+  so the equality holds in this case. For the induction step, let
+  \(bs = b : bs'\), and suppose the equality holds for \(bs'\). In
+  this case, we have \(ts = t : ts'\), where \(t = (\pi, b)\) and
+  \(ts' = ((\pi,b') \, | \, \forall b' \in bs')\). Then, we have
+  \begin{align*}
+    \out{c^*}\left(ts, ()\right) &= \out{c}(t, \trans{c^*}(ts', ()))
+    : \out{c^*}(ts', ()) \\
+    &= \out{c}(t, bs') : \out{c^*}(ts', ()) \\
+    &= \out{m}(t, \trans{m^*}(ts', s_0)) : \out{m^*}(ts', s_0) \\
+    &= \out{m^*}(ts, s_0)
+  \end{align*}
+\end{proof}
+
+\newpage
+
+\section{Abstract version}
+
+\subsection{Values}
+
+\begin{defn}
+  Let \(\V\) be a partially ordered commutative monoid with a least
+  element \(\bot \in \V\).
+\end{defn}
+
+\subsection{Accounts}
+
+\begin{defn}
+  Let \(\K\) be a set.
+\end{defn}
+
+\subsection{Source account}
+
+\begin{defn}
+  Let \(\source \in \K\).
+\end{defn}
+
+\subsection{Transactions}
+
+\begin{defn}
+  Let \(\T := \{v \in \V^\K, \text{ such that } \sum_{k \in \K} v_k
+  \leq 0\}\).
+\end{defn}
+
+\subsection{Account balances}
+
+\begin{defn}
+  Let \(\S := \{b \in
+      \V^{\K}, \text{ such that } b_k \geq 0,\, \forall k \in \K
+  \backslash \{\source\}\}.\)
+\end{defn}
+
+\subsection{Balance proofs and blocks}
+
+\begin{defn}
+  Let \(\B\) be a set.
+\end{defn}
+
+\begin{defn}
+  Let \(\Pi\) be a proset.
+\end{defn}
+
+\begin{defn}
+  Let \(\mathsf{TransactionsInBlock} : \Pi \times \B \to \T^*\) be a
+  monotone function.
+\end{defn}
+
+\subsection{Transition function for complete transactions}
+
+\begin{defn}
+  Let
+  \begin{align*}
+    f_c : \T \times \S &\to \S \times \T \\
+    (t,b) &\mapsto
+    \begin{cases}
+      (b + t, t), & \text{if \(b + t \in \S\)} \\
+      (b, 0),            & \text{otherwise}.
+    \end{cases}
+  \end{align*}
+\end{defn}
+
+\begin{prop}
+  We have
+  \begin{equation*}
+    \sum_{k \in \K} f_c(t,b)_k \leq \sum_{k \in
+    \K} b_k, \quad \forall t \in \T,\, b \in \S.
+  \end{equation*}
+\end{prop}
+
+\subsection{Transition function for partial transactions}
+
+\begin{defn}
+  Let
+  \[f : \T \times \S \to \S \times \T\] be a monotone function such that
+  \[f(t,b) \leq f_c(t,b)\] for all \((t,b) \in \T \times \S\)
+  .
+\end{defn}
+
+\begin{prop}
+  We have
+  \begin{equation*}
+    \sum_{k \in \K} f(t,b)_k \leq \sum_{k \in \K} b_k,
+    \quad \forall t \in \T,\, b \in \S.
+  \end{equation*}
+\end{prop}
+
+\subsection{Rollup contract}
+
+\begin{defn}
+  Let \(\S_{contract} := \B^*.\)
+\end{defn}
+
+\begin{defn}
+  Let \[\T_{contract} := \B \times \Pi.\]
+\end{defn}
+
+\begin{defn}
+  Let
+  \[
+    \begin{aligned}[t]
+      f_{contract} \colon \T_{contract} \times \S_{contract} \to
+      &\, \S_{contract} \times \T^*
+      \\
+      ((B,\pi), B_*)
+      \mapsto &\, (B_* || B, T_*) \\
+      &\, \text{where} \\
+      & \quad T'_* = \mathsf{TransactionsInBlock}(\pi, B) \\
+      & \quad (b,\_) = \mathsf{Bal}(\pi,B_*) \\
+      & \quad (\_,T_*) = f^*(T'_*,b)
+    \end{aligned}
+  \]
+\end{defn}
+
+\begin{defn}
+  Let
+  \[
+    \begin{aligned}[t]
+      f_{contractBalance} \colon \T_{contract} \times (\S_{contract}
+      \times \T) \to
+      &\, (\S_{contract} \times \T) \times \T
+    \end{aligned}
+  \]
+  be the composition of \(f_{contract}\) with the Mealy machine
+  associated to the partial ordered monoid \(\T\).
+
+\end{defn}
+
+\begin{thm}
+  Let \(T_* = (B_i,\pi_i)_{i \in [n]}\) be a list of contract
+  transactions, and let \(\pi\) be an upper bound of the balance proofs
+  \(\pi_*\). Then, the resulting contract balance is positive.
+\end{thm}
 
 \include{sections/discussion}
 
